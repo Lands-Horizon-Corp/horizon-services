@@ -29,7 +29,7 @@ if err := database.Start(ctx); err != nil {
 // SQLDatabase defines the interface for PostgreSQL operations
 type SQLDatabase interface {
 	// Start initializes the connection pool with the database
-	Start(ctx context.Context) error
+	Run(ctx context.Context) error
 
 	// Stop closes all database connections
 	Stop(ctx context.Context) error
@@ -80,7 +80,7 @@ func (g *GormDatabase) Ping(ctx context.Context) error {
 }
 
 // Start initializes the GORM connection pool
-func (g *GormDatabase) Start(ctx context.Context) error {
+func (g *GormDatabase) Run(ctx context.Context) error {
 	config := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	}

@@ -23,7 +23,7 @@ type SMTPRequest[T any] struct {
 
 type SMTPService[T any] interface {
 	// Run initializes internal resources like rate limiter
-	Run() error
+	Run(ctx context.Context) error
 
 	// Stop cleans up resources
 	Stop(ctx context.Context) error
@@ -58,7 +58,7 @@ func NewHorizonSMTP[T any](host string, port int, username, password string, fro
 }
 
 // Run implements SMTPService.
-func (h *HorizonSMTP[T]) Run() error {
+func (h *HorizonSMTP[T]) Run(ctx context.Context) error {
 	h.limiterOnce.Do(func() {
 		h.limiter = rate.NewLimiter(rate.Limit(1), 3)
 	})
@@ -100,6 +100,13 @@ func (h *HorizonSMTP[T]) Send(ctx context.Context, req SMTPRequest[T]) error {
 	if err := h.limiter.Wait(ctx); err != nil {
 		return eris.Wrap(err, "rate limit wait failed")
 	}
+
+	// Check if rate limiter exceed
+	if !h.limiter.Allow() {
+		err := fmt.Errorf("rate limit exceeded for sending SMS")
+		return err
+	}
+
 	// Sanitize the raw body template for safety
 	req.Body = bluemonday.UGCPolicy().Sanitize(req.Body)
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/mail"
 	"os"
+	"regexp"
 )
 
 func isValidFilePath(p string) error {
@@ -27,4 +28,9 @@ func IsValidEmail(email string) bool {
 	}
 	_, err := mail.ParseAddress(email)
 	return err == nil
+}
+
+func IsValidPhoneNumber(phoneNumber string) bool {
+	re := regexp.MustCompile(`^\+?(?:\d{1,4})?\d{7,14}$`)
+	return re.MatchString(phoneNumber)
 }
