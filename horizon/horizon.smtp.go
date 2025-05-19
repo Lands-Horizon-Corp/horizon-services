@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/smtp"
+	"os"
 	"sync"
 
 	"github.com/microcosm-cc/bluemonday"
@@ -114,7 +115,19 @@ func (h *HorizonSMTP[T]) Stop(ctx context.Context) error {
 
 // Format implements SMTPService.
 func (h *HorizonSMTP[T]) Format(ctx context.Context, req SMTPRequest[T]) (*SMTPRequest[T], error) {
-	tmpl, err := template.New("email").Parse(req.Body)
+	var tmplBody string
+
+	if err := isValidFilePath(req.Body); err == nil {
+		content, err := os.ReadFile(req.Body)
+		if err != nil {
+			return nil, eris.Wrap(err, "failed to read template file")
+		}
+		tmplBody = string(content)
+	} else {
+		tmplBody = req.Body
+	}
+
+	tmpl, err := template.New("email").Parse(tmplBody)
 	if err != nil {
 		return nil, eris.Wrap(err, "parse template failed")
 	}

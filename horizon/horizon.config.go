@@ -1,8 +1,10 @@
 package horizon
 
 import (
+	"log"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -30,7 +32,11 @@ type EnvironmentService interface {
 }
 type HorizonEnvironmentService struct{}
 
-func NewEnvironmentService() EnvironmentService {
+func NewEnvironmentService(path string) EnvironmentService {
+	err := godotenv.Load(path)
+	if err != nil {
+		log.Printf("Warning: .env file not loaded from path: %s, err: %v", path, err)
+	}
 	viper.AutomaticEnv()
 	return HorizonEnvironmentService{}
 }

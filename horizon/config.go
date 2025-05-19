@@ -1,5 +1,0 @@
-package horizon
-
-func HorizonConfig() {
-
-}
