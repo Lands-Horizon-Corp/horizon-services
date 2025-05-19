@@ -2,6 +2,7 @@ package horizon
 
 import (
 	"errors"
+	"net/mail"
 	"os"
 )
 
@@ -17,4 +18,13 @@ func isValidFilePath(p string) error {
 		return errors.New("is dir")
 	}
 	return nil
+}
+
+// IsValidEmail checks if the provided string is a valid email address format
+func IsValidEmail(email string) bool {
+	if email == "" {
+		return false
+	}
+	_, err := mail.ParseAddress(email)
+	return err == nil
 }
