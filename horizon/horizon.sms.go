@@ -14,6 +14,44 @@ import (
 	"golang.org/x/time/rate"
 )
 
+/*
+
+// Replace with your actual Twilio credentials
+accountSID := "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+authToken := "your_twilio_auth_token"
+sender := "+1234567890" // Must be a Twilio-verified number
+
+// Initialize the SMS service with a 160-character limit
+smsService := horizon.NewHorizonSMS[horizon.AlertVars](accountSID, authToken, sender, 160)
+
+ctx := context.Background()
+
+// Start the service
+if err := smsService.Run(ctx); err != nil {
+	log.Fatalf("failed to start SMS service: %v", err)
+}
+defer smsService.Stop(ctx)
+
+// Define the message with a template
+message := horizon.SMSRequest[horizon.AlertVars]{
+	To: "+19876543210", // Recipient number
+	Body: "Hello {{.Name}},\nAlert Code: {{.Code}}\nDetails: {{.Message}}", // Templated body
+	Vars: horizon.AlertVars{
+		Name:    "John Doe",
+		Code:    "ALRT-001",
+		Message: "Suspicious activity detected on your account.",
+	},
+}
+
+// Send the SMS
+err := smsService.Send(ctx, message)
+if err != nil {
+	log.Fatalf("failed to send SMS: %v", err)
+}
+
+fmt.Println("SMS successfully sent.")
+*/
+
 // SMSRequest represents a templated SMS message with dynamic variables
 type SMSRequest[T any] struct {
 	To   string // Recipient phone number
@@ -41,10 +79,10 @@ type HorizonSMS[T any] struct {
 	limiter     *rate.Limiter
 	twilio      *twilio.RestClient
 
-	accountSID    string
-	authToken     string
-	sender        string
-	maxCharacters int32
+	accountSID    string // Twilio Account SID
+	authToken     string // Twilio Auth Token
+	sender        string // Sender phone number registered with Twilio
+	maxCharacters int32  // Maximum allowed length for SMS body
 }
 
 func NewHorizonSMS[T any](accountSID, authToken, sender string, maxCharacters int32) SMSService[T] {
@@ -89,46 +127,50 @@ func (h *HorizonSMS[T]) Format(ctx context.Context, req SMSRequest[T]) (*SMSRequ
 	return &req, nil
 }
 
-// SendSMS implements SMSService.
+// Send formats and sends the SMS using Twilio
 func (h *HorizonSMS[T]) Send(ctx context.Context, req SMSRequest[T]) error {
+	// Validate recipient phone number
 	if !IsValidPhoneNumber(req.To) {
-		err := fmt.Errorf("invalid recipient phone number format: %s", req.To)
-		return err
-	}
-	if !IsValidPhoneNumber(h.sender) {
-		err := fmt.Errorf("invalid admin phone number format: %s", req.To)
-		return err
-	}
-	if len(req.Body) > int(h.maxCharacters) {
-		err := fmt.Errorf("SMS body exceeds %d characters (actual: %d)", h.maxCharacters, len(req.Body))
-		return err
+		return fmt.Errorf("invalid recipient phone number format: %s", req.To)
 	}
 
-	// Apply rate limiting to control send rate
+	// Validate sender phone number
+	if !IsValidPhoneNumber(h.sender) {
+		return fmt.Errorf("invalid admin phone number format: %s", h.sender)
+	}
+
+	// Ensure SMS body length is within limit
+	if len(req.Body) > int(h.maxCharacters) {
+		return fmt.Errorf("SMS body exceeds %d characters (actual: %d)", h.maxCharacters, len(req.Body))
+	}
+
+	// Apply rate limit to prevent sending too fast
 	if err := h.limiter.Wait(ctx); err != nil {
 		return eris.Wrap(err, "rate limit wait failed")
 	}
 
-	// Check if rate limiter exceed
+	// Ensure the request is still allowed after waiting
 	if !h.limiter.Allow() {
-		err := fmt.Errorf("rate limit exceeded for sending SMS")
-		return err
+		return fmt.Errorf("rate limit exceeded for sending SMS")
 	}
 
-	// Sanitize the raw body template for safety
+	// Sanitize message body to remove harmful content
 	req.Body = bluemonday.UGCPolicy().Sanitize(req.Body)
 
-	// Inject dynamic variables into the sanitized body
+	// Re-inject template variables after sanitizing
 	finalBody, err := h.Format(ctx, req)
 	if err != nil {
 		return eris.Wrap(err, "failed to inject variables into body")
 	}
 	req.Body = finalBody.Body
 
+	// Build Twilio message parameters
 	params := &openapi.CreateMessageParams{}
 	params.SetTo(req.To)
 	params.SetFrom(h.sender)
+	params.SetBody(req.Body)
 
+	// Send the message using Twilio's REST API
 	_, err = h.twilio.Api.CreateMessage(params)
 	if err != nil {
 		return eris.Wrap(err, "failed to send SMS via Twilio")
