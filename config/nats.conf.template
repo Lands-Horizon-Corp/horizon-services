@@ -1,0 +1,7 @@
+port: ${NATS_CLIENT_PORT}
+http: ${NATS_MONITOR_PORT}
+
+websocket {
+  port: ${NATS_WEBSOCKET_PORT}
+  no_tls: true
+}
