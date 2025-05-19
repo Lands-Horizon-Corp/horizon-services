@@ -16,6 +16,7 @@ func setupSecurityUtils() horizon.SecurityUtils {
 		2,       // parallelism
 		16,      // salt length in bytes
 		32,      // key length in bytes
+		[]byte("1234567890ABCDEF1234567890ABCDEF"),
 	)
 }
 
@@ -51,9 +52,8 @@ func TestEncryptAndDecrypt(t *testing.T) {
 	ctx := context.Background()
 
 	plaintext := "Confidential Info"
-	key := "dummy-key" // not used in current Encrypt/Decrypt
 
-	encrypted, err := sec.Encrypt(ctx, plaintext, key)
+	encrypted, err := sec.Encrypt(ctx, plaintext)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, encrypted)
 
@@ -61,7 +61,7 @@ func TestEncryptAndDecrypt(t *testing.T) {
 	_, err = base64.StdEncoding.DecodeString(encrypted)
 	assert.NoError(t, err)
 
-	decrypted, err := sec.Decrypt(ctx, encrypted, key)
+	decrypted, err := sec.Decrypt(ctx, encrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, plaintext, decrypted)
 }

@@ -2,9 +2,14 @@ package horizon
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/google/uuid"
@@ -24,10 +29,10 @@ type SecurityUtils interface {
 	VerifyPassword(ctx context.Context, hash, password string) (bool, error)
 
 	// Encrypt performs AES encryption on plaintext
-	Encrypt(ctx context.Context, plaintext, key string) (string, error)
+	Encrypt(ctx context.Context, plaintext string) (string, error)
 
 	// Decrypt performs AES decryption on ciphertext
-	Decrypt(ctx context.Context, ciphertext, key string) (string, error)
+	Decrypt(ctx context.Context, ciphertext string) (string, error)
 }
 
 // HorizonSecurity is a concrete implementation of SecurityUtils
@@ -37,6 +42,7 @@ type HorizonSecurity struct {
 	parallelism uint8
 	saltLength  uint32
 	keyLength   uint32
+	secret      []byte
 }
 
 // NewSecurityUtils returns a new instance of SecurityUtils
@@ -46,6 +52,7 @@ func NewSecurityUtils(
 	parallelism uint8,
 	saltLength uint32,
 	keyLength uint32,
+	secret []byte,
 ) SecurityUtils {
 
 	return &HorizonSecurity{
@@ -54,21 +61,54 @@ func NewSecurityUtils(
 		parallelism: parallelism,
 		saltLength:  saltLength,
 		keyLength:   keyLength,
+		secret:      secret,
 	}
 }
 
 // Decrypt implements SecurityUtils.
-func (h *HorizonSecurity) Decrypt(ctx context.Context, ciphertext string, key string) (string, error) {
-	decoded, err := base64.StdEncoding.DecodeString(ciphertext)
+func (h *HorizonSecurity) Decrypt(ctx context.Context, ciphertext string) (string, error) {
+	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return "", err
 	}
-	return string(decoded), nil
+	block, err := aes.NewCipher([]byte(Create32ByteKey(h.secret)))
+	if err != nil {
+		return "", err
+	}
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonceSize := aesGCM.NonceSize()
+	if len(data) < nonceSize {
+		return "", errors.New("ciphertext too short")
+	}
+	nonce, encryptedData := data[:nonceSize], data[nonceSize:]
+	plaintext, err := aesGCM.Open(nil, nonce, []byte(encryptedData), nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
 }
 
 // Encrypt implements SecurityUtils.
-func (h *HorizonSecurity) Encrypt(ctx context.Context, plaintext string, key string) (string, error) {
-	return base64.StdEncoding.EncodeToString([]byte(plaintext)), nil
+func (h *HorizonSecurity) Encrypt(ctx context.Context, plaintext string) (string, error) {
+	block, err := aes.NewCipher([]byte(Create32ByteKey(h.secret)))
+	if err != nil {
+		return "", err
+	}
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintext), nil)
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
 // GenerateUUID implements SecurityUtils.

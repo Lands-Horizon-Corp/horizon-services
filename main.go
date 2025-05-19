@@ -18,6 +18,7 @@ func main() {
 		2,       // parallelism
 		16,      // salt length in bytes
 		32,      // key length in bytes
+		[]byte("1234567890ABCDEF1234567890ABCDEF"),
 	)
 
 	// Generate UUID
@@ -44,15 +45,14 @@ func main() {
 
 	// Encrypt plaintext
 	plaintext := "Secret Message"
-	key := "dummy-key" // Not used in your current implementation
-	encrypted, err := sec.Encrypt(ctx, plaintext, key)
+	encrypted, err := sec.Encrypt(ctx, plaintext)
 	if err != nil {
 		log.Fatalf("Error encrypting: %v", err)
 	}
 	fmt.Println("Encrypted:", encrypted)
 
 	// Decrypt ciphertext
-	decrypted, err := sec.Decrypt(ctx, encrypted, key)
+	decrypted, err := sec.Decrypt(ctx, encrypted)
 	if err != nil {
 		log.Fatalf("Error decrypting: %v", err)
 	}

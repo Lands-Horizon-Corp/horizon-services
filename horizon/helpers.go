@@ -45,3 +45,12 @@ func GenerateRandomBytes(n uint32) ([]byte, error) {
 
 	return b, nil
 }
+
+func Create32ByteKey(key []byte) string {
+	if len(key) > 32 {
+		return string(key[:32])
+	}
+	padded := make([]byte, 32)
+	copy(padded, key)
+	return string(padded)
+}
