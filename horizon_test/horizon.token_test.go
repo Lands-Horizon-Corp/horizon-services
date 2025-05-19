@@ -26,12 +26,11 @@ func (c TestClaim) GetRegisteredClaims() *jwt.RegisteredClaims {
 
 func setupService() *horizon.HorizonTokenService[TestClaim] {
 	env := horizon.NewEnvironmentService("../.env")
-	token := env.GetString("APP_TOKEN", "")
+	token := []byte(env.GetString("APP_TOKEN", ""))
 	name := env.GetString("APP_NAME", "")
-	secret := []byte(token)
 	return &horizon.HorizonTokenService[TestClaim]{
 		Name:   name,
-		Secret: secret,
+		Secret: token,
 	}
 }
 
@@ -83,7 +82,6 @@ func TestSetGetAndCleanToken(t *testing.T) {
 
 	// Cookie was set in the response header
 	cookies := rec.Result().Cookies()
-
 	assert.Len(t, cookies, 1)
 	setC := cookies[0]
 	assert.Equal(t, svc.Name, setC.Name)

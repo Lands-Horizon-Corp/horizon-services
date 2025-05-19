@@ -10,13 +10,15 @@ import (
 )
 
 func setupSecurityUtils() horizon.SecurityUtils {
+	env := horizon.NewEnvironmentService("../.env")
+	token := []byte(env.GetString("APP_TOKEN", ""))
 	return horizon.NewSecurityUtils(
-		64*1024, // memory (e.g., 64MB)
-		3,       // iterations
-		2,       // parallelism
-		16,      // salt length in bytes
-		32,      // key length in bytes
-		[]byte("1234567890ABCDEF1234567890ABCDEF"),
+		env.GetUint32("PASSWORD_MEMORY", 65536),  // memory (e.g., 64MB)
+		env.GetUint32("PASSWORD_ITERATIONS", 3),  // iterations
+		env.GetUint8("PASSWORD_PARALLELISM", 2),  // parallelism
+		env.GetUint32("PASSWORD_SALT_LENTH", 16), // salt length in bytes
+		env.GetUint32("PASSWORD_KEY_LENGTH", 32), // key length in bytes
+		token,
 	)
 }
 
