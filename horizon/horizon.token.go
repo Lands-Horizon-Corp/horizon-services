@@ -61,11 +61,8 @@ type HorizonTokenService[T JWTClaims] struct {
 	secret []byte
 }
 
-func NewTokenService[T JWTClaims](name string, secret []byte) TokenService[T] {
-	return &HorizonTokenService[T]{
-		name:   name,
-		secret: secret,
-	}
+func NewTokenService[T JWTClaims](value *HorizonTokenService[T]) TokenService[T] {
+	return value
 }
 
 // CleanToken implements TokenService.
