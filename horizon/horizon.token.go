@@ -30,21 +30,21 @@ type TokenService[T jwt.Claims] interface {
 }
 
 type HorizonTokenService[T jwt.Claims] struct {
-	name   string
-	secret []byte
+	Name   string
+	Secret []byte
 }
 
 func NewTokenService[T jwt.Claims](name string, secret []byte) TokenService[T] {
 	return &HorizonTokenService[T]{
-		name:   name,
-		secret: secret,
+		Name:   name,
+		Secret: secret,
 	}
 }
 
 // CleanToken implements TokenService.
 func (h *HorizonTokenService[T]) CleanToken(ctx context.Context, c echo.Context) {
 	cookie := &http.Cookie{
-		Name:     h.name,
+		Name:     h.Name,
 		Value:    "",
 		Path:     "/",
 		Expires:  time.Now().Add(-1 * time.Hour),
@@ -57,7 +57,7 @@ func (h *HorizonTokenService[T]) CleanToken(ctx context.Context, c echo.Context)
 
 // GetToken implements TokenService.
 func (h *HorizonTokenService[T]) GetToken(ctx context.Context, c echo.Context) (*T, error) {
-	cookie, err := c.Cookie(h.name)
+	cookie, err := c.Cookie(h.Name)
 	if err != nil {
 		h.CleanToken(ctx, c)
 		return nil, eris.New("authentication token not found")
@@ -84,7 +84,7 @@ func (h *HorizonTokenService[T]) SetToken(ctx context.Context, c echo.Context, c
 		return eris.Wrap(err, "GenerateToken failed")
 	}
 	cookie := &http.Cookie{
-		Name:     h.name,
+		Name:     h.Name,
 		Value:    tok,
 		Path:     "/",
 		Expires:  time.Now().Add(expiry),
@@ -118,7 +118,7 @@ func (h *HorizonTokenService[T]) GenerateToken(ctx context.Context, claims T, ex
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(h.secret)
+	signed, err := token.SignedString(h.Secret)
 	if err != nil {
 		return "", eris.Wrap(err, "signing token failed")
 	}
@@ -134,7 +134,7 @@ func (h *HorizonTokenService[T]) VerifyToken(ctx context.Context, value string) 
 		if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, eris.Wrap(jwt.ErrSignatureInvalid, "unexpected signing method")
 		}
-		return h.secret, nil
+		return h.Secret, nil
 	})
 	if err != nil {
 		return nil, eris.Wrap(err, "token parse failed")

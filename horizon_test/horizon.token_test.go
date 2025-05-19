@@ -10,6 +10,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
+	"github.com/lands-horizon/horizon-server/horizon"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,11 +24,14 @@ func (c TestClaim) GetRegisteredClaims() *jwt.RegisteredClaims {
 	return &c.RegisteredClaims
 }
 
-func setupService() *HorizonTokenService[TestClaim] {
-	secret := []byte("super-secret-key")
-	return &HorizonTokenService[TestClaim]{
-		name:   "test_token",
-		secret: secret,
+func setupService() *horizon.HorizonTokenService[TestClaim] {
+	env := horizon.NewEnvironmentService("../.env")
+	token := env.GetString("APP_TOKEN", "")
+	name := env.GetString("APP_NAME", "")
+	secret := []byte(token)
+	return &horizon.HorizonTokenService[TestClaim]{
+		Name:   name,
+		Secret: secret,
 	}
 }
 
@@ -40,7 +44,7 @@ func TestGenerateAndVerifyToken(t *testing.T) {
 		Username: "alice",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:     "user-123",
-			Issuer: svc.name,
+			Issuer: svc.Name,
 		},
 	}
 
@@ -71,7 +75,7 @@ func TestSetGetAndCleanToken(t *testing.T) {
 		Username: "bob",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:     "user-456",
-			Issuer: svc.name,
+			Issuer: svc.Name,
 		},
 	}
 	err := svc.SetToken(ctx, c, claim, time.Minute)
@@ -79,9 +83,10 @@ func TestSetGetAndCleanToken(t *testing.T) {
 
 	// Cookie was set in the response header
 	cookies := rec.Result().Cookies()
+
 	assert.Len(t, cookies, 1)
 	setC := cookies[0]
-	assert.Equal(t, svc.name, setC.Name)
+	assert.Equal(t, svc.Name, setC.Name)
 	assert.NotEmpty(t, setC.Value)
 	assert.WithinDuration(t, time.Now().Add(time.Minute), setC.Expires, time.Second)
 
@@ -103,12 +108,12 @@ func TestSetGetAndCleanToken(t *testing.T) {
 	// Echo may append multiple Set-Cookie; find ours
 	var found *http.Cookie
 	for _, ck := range cleanCookies {
-		if ck.Name == svc.name {
+		if ck.Name == svc.Name {
 			found = ck
 			break
 		}
 	}
-	if assert.NotNil(t, found, "expected CleanToken to set a cookie for %q", svc.name) {
+	if assert.NotNil(t, found, "expected CleanToken to set a cookie for %q", svc.Name) {
 		assert.Equal(t, "", found.Value)
 		// Expires in the past
 		assert.True(t, found.Expires.Before(time.Now()))
@@ -123,16 +128,18 @@ func TestVerifyToken_BadBase64(t *testing.T) {
 }
 
 func TestVerifyToken_BadSignature(t *testing.T) {
-	// Generate with one secret, verify with another
+	env := horizon.NewEnvironmentService("../.env")
+	name := env.GetString("APP_NAME", "")
+
 	ctx := context.Background()
 	svcGood := setupService()
-	svcBad := &HorizonTokenService[TestClaim]{name: "test_token", secret: []byte("wrong-key")}
+	svcBad := &horizon.HorizonTokenService[TestClaim]{Name: name, Secret: []byte("wrong-key")}
 
 	claim := TestClaim{
 		Username: "eve",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:     "u789",
-			Issuer: svcGood.name,
+			Issuer: svcGood.Name,
 		},
 	}
 	token, err := svcGood.GenerateToken(ctx, claim, time.Hour)
