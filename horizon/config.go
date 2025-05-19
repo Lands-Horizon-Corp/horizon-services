@@ -1,0 +1,5 @@
+package horizon
+
+func HorizonConfig() {
+
+}
