@@ -1,6 +1,16 @@
 package horizon
 
-import "context"
+import (
+	"context"
+	"crypto/subtle"
+	"encoding/base64"
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/rotisserie/eris"
+	"golang.org/x/crypto/argon2"
+)
 
 // SecurityUtils provides cryptographic and security-related functions
 type SecurityUtils interface {
@@ -13,12 +23,118 @@ type SecurityUtils interface {
 	// VerifyPassword compares a password with its hash
 	VerifyPassword(ctx context.Context, hash, password string) (bool, error)
 
-	// SanitizeHTML removes potentially dangerous HTML content
-	SanitizeHTML(ctx context.Context, input string) (string, error)
-
 	// Encrypt performs AES encryption on plaintext
 	Encrypt(ctx context.Context, plaintext, key string) (string, error)
 
 	// Decrypt performs AES decryption on ciphertext
 	Decrypt(ctx context.Context, ciphertext, key string) (string, error)
+}
+
+// HorizonSecurity is a concrete implementation of SecurityUtils
+type HorizonSecurity struct {
+	memory      uint32
+	iterations  uint32
+	parallelism uint8
+	saltLength  uint32
+	keyLength   uint32
+}
+
+// NewSecurityUtils returns a new instance of SecurityUtils
+func NewSecurityUtils(
+	memory uint32,
+	iterations uint32,
+	parallelism uint8,
+	saltLength uint32,
+	keyLength uint32,
+) SecurityUtils {
+
+	return &HorizonSecurity{
+		memory:      memory,
+		iterations:  iterations,
+		parallelism: parallelism,
+		saltLength:  saltLength,
+		keyLength:   keyLength,
+	}
+}
+
+// Decrypt implements SecurityUtils.
+func (h *HorizonSecurity) Decrypt(ctx context.Context, ciphertext string, key string) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
+}
+
+// Encrypt implements SecurityUtils.
+func (h *HorizonSecurity) Encrypt(ctx context.Context, plaintext string, key string) (string, error) {
+	return base64.StdEncoding.EncodeToString([]byte(plaintext)), nil
+}
+
+// GenerateUUID implements SecurityUtils.
+func (h *HorizonSecurity) GenerateUUID(ctx context.Context) (string, error) {
+	u, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
+
+// VerifyPassword implements SecurityUtils.
+func (h *HorizonSecurity) HashPassword(ctx context.Context, password string) (string, error) {
+	salt, err := GenerateRandomBytes(h.saltLength)
+	if err != nil {
+		return "", err
+	}
+	hash := argon2.IDKey([]byte(password), salt, h.iterations, h.memory, h.parallelism, h.keyLength)
+	b64Salt := base64.RawStdEncoding.EncodeToString(salt)
+	b64Hash := base64.RawStdEncoding.EncodeToString(hash)
+	encodedHash := fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, h.memory, h.iterations, h.parallelism, b64Salt, b64Hash)
+	return encodedHash, nil
+}
+
+// VerifyPassword implements SecurityUtils.
+func (h *HorizonSecurity) VerifyPassword(ctx context.Context, hash string, password string) (bool, error) {
+	vals := strings.Split(hash, "$")
+	if len(vals) != 6 {
+		return false, eris.New("the encoded hash is not in the correct format")
+	}
+
+	var version int
+	_, err := fmt.Sscanf(vals[2], "v=%d", &version)
+	if err != nil {
+		return false, err
+	}
+
+	if version != argon2.Version {
+		return false, eris.New("incompatible version of argon2")
+	}
+
+	var p struct {
+		memory      uint32
+		iterations  uint32
+		parallelism uint8
+	}
+
+	_, err = fmt.Sscanf(vals[3], "m=%d,t=%d,p=%d", &p.memory, &p.iterations, &p.parallelism)
+	if err != nil {
+		return false, err
+	}
+
+	salt, err := base64.RawStdEncoding.Strict().DecodeString(vals[4])
+	if err != nil {
+		return false, err
+	}
+
+	hashed, err := base64.RawStdEncoding.Strict().DecodeString(vals[5])
+	if err != nil {
+		return false, err
+	}
+
+	otherHash := argon2.IDKey([]byte(password), salt, p.iterations, p.memory, p.parallelism, h.keyLength)
+
+	if subtle.ConstantTimeCompare(hashed, otherHash) == 1 {
+		return true, nil
+	}
+	return false, nil
 }

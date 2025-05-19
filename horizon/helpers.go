@@ -1,6 +1,7 @@
 package horizon
 
 import (
+	"crypto/rand"
 	"errors"
 	"net/mail"
 	"os"
@@ -33,4 +34,14 @@ func IsValidEmail(email string) bool {
 func IsValidPhoneNumber(phoneNumber string) bool {
 	re := regexp.MustCompile(`^\+?(?:\d{1,4})?\d{7,14}$`)
 	return re.MatchString(phoneNumber)
+}
+
+func GenerateRandomBytes(n uint32) ([]byte, error) {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }

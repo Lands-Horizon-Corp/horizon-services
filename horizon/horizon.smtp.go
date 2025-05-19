@@ -13,6 +13,47 @@ import (
 	"golang.org/x/time/rate"
 )
 
+/*
+func main() {
+    // Initialize HorizonSMTP
+    smtpService := NewHorizonSMTP("smtp.example.com", 587, "your_username", "your_password", "your_email@example.com")
+
+    // Run the SMTP service (initialize resources like rate limiter)
+    if err := smtpService.Run(context.Background()); err != nil {
+        fmt.Println("Failed to run SMTP service:", err)
+        return
+    }
+
+    // Example SMTP request
+    emailRequest := SMTPRequest{
+        To:      "recipient@example.com",
+        Subject: "Test Email",
+        Body:    "Hello {{.Name}},\n\nThis is a test email.",
+        Vars: struct {
+            Name string
+        }{
+            Name: "John Doe",
+        },
+    }
+
+    // Format the email body with dynamic variables
+    formattedRequest, err := smtpService.Format(context.Background(), emailRequest)
+    if err != nil {
+        fmt.Println("Failed to format email:", err)
+        return
+    }
+
+    // Send the formatted email
+    if err := smtpService.Send(context.Background(), *formattedRequest); err != nil {
+        fmt.Println("Failed to send email:", err)
+        return
+    }
+
+    fmt.Println("Email sent successfully!")
+}
+
+*/
+
 // SMTPRequest represents a templated SMTP request with dynamic variables
 type SMTPRequest[T any] struct {
 	To      string // Recipient SMTP address

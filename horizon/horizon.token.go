@@ -11,35 +11,8 @@ import (
 	"github.com/rotisserie/eris"
 )
 
-/*
-
-type OwnerClaim struct {
-	UserID         string `json:"user_id"`
-	OrganizationID string `json:"organization_id"`
-	Role           string `json:"role"`
-	jwt.RegisteredClaims
-}
-
-func (c OwnerClaim) GetRegisteredClaims() *jwt.RegisteredClaims {
-	return &c.RegisteredClaims
-}
-
-var jwtSecret = []byte("your-secret-key")
-
-// Owner tokens
-ownerTokenService := NewTokenService[OwnerClaim]("owner_token", jwtSecret)
-
-// Member tokens
-memberTokenService := NewTokenService[MemberClaim]("member_token", jwtSecret)
-*/
-
-type JWTClaims interface {
-	jwt.Claims
-	GetRegisteredClaims() *jwt.RegisteredClaims
-}
-
 // TokenService manages JWT token lifecycle
-type TokenService[T JWTClaims] interface {
+type TokenService[T jwt.Claims] interface {
 	// GetToken extracts and validates token from request context
 	GetToken(ctx context.Context, c echo.Context) (*T, error)
 
@@ -56,13 +29,16 @@ type TokenService[T JWTClaims] interface {
 	GenerateToken(ctx context.Context, claims T, expiry time.Duration) (string, error)
 }
 
-type HorizonTokenService[T JWTClaims] struct {
+type HorizonTokenService[T jwt.Claims] struct {
 	name   string
 	secret []byte
 }
 
-func NewTokenService[T JWTClaims](value *HorizonTokenService[T]) TokenService[T] {
-	return value
+func NewTokenService[T jwt.Claims](name string, secret []byte) TokenService[T] {
+	return &HorizonTokenService[T]{
+		name:   name,
+		secret: secret,
+	}
 }
 
 // CleanToken implements TokenService.
@@ -77,31 +53,6 @@ func (h *HorizonTokenService[T]) CleanToken(ctx context.Context, c echo.Context)
 		SameSite: http.SameSiteLaxMode,
 	}
 	c.SetCookie(cookie)
-}
-
-// GenerateToken implements TokenService.
-func (h *HorizonTokenService[T]) GenerateToken(ctx context.Context, claims T, expiry time.Duration) (string, error) {
-	now := time.Now()
-	rc := claims.GetRegisteredClaims()
-
-	if rc.NotBefore == nil {
-		rc.NotBefore = jwt.NewNumericDate(now)
-	}
-	if rc.IssuedAt == nil {
-		rc.IssuedAt = jwt.NewNumericDate(now)
-	}
-	if rc.ExpiresAt == nil {
-		rc.ExpiresAt = jwt.NewNumericDate(now.Add(expiry))
-	}
-	if rc.Subject == "" {
-		rc.Subject = rc.ID
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(h.secret)
-	if err != nil {
-		return "", eris.Wrap(err, "signing token failed")
-	}
-	return base64.StdEncoding.EncodeToString([]byte(signed)), nil
 }
 
 // GetToken implements TokenService.
@@ -122,6 +73,7 @@ func (h *HorizonTokenService[T]) GetToken(ctx context.Context, c echo.Context) (
 		h.CleanToken(ctx, c)
 		return nil, eris.Wrap(err, "invalid or expired authentication token")
 	}
+
 	return claim, nil
 }
 
@@ -144,14 +96,41 @@ func (h *HorizonTokenService[T]) SetToken(ctx context.Context, c echo.Context, c
 	return nil
 }
 
-// VerifyToken implements TokenService.
+// GenerateToken implements TokenService.
+func (h *HorizonTokenService[T]) GenerateToken(ctx context.Context, claims T, expiry time.Duration) (string, error) {
+	now := time.Now()
+
+	// Check if the claims implement GetRegisteredClaims via pointer receiver
+	if rcGetter, ok := any(&claims).(interface{ GetRegisteredClaims() *jwt.RegisteredClaims }); ok {
+		rc := rcGetter.GetRegisteredClaims()
+		if rc.NotBefore == nil {
+			rc.NotBefore = jwt.NewNumericDate(now)
+		}
+		if rc.IssuedAt == nil {
+			rc.IssuedAt = jwt.NewNumericDate(now)
+		}
+		if rc.ExpiresAt == nil {
+			rc.ExpiresAt = jwt.NewNumericDate(now.Add(expiry))
+		}
+		if rc.Subject == "" && rc.ID != "" {
+			rc.Subject = rc.ID
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString(h.secret)
+	if err != nil {
+		return "", eris.Wrap(err, "signing token failed")
+	}
+	return base64.StdEncoding.EncodeToString([]byte(signed)), nil
+}
 func (h *HorizonTokenService[T]) VerifyToken(ctx context.Context, value string) (*T, error) {
 	raw, err := base64.StdEncoding.DecodeString(value)
 	if err != nil {
 		return nil, eris.Wrap(err, "invalid base64 token")
 	}
-	var claims T
-	tok, err := jwt.ParseWithClaims(string(raw), claims, func(tkn *jwt.Token) (any, error) {
+	var claim T
+	token, err := jwt.ParseWithClaims(string(raw), any(&claim).(jwt.Claims), func(tkn *jwt.Token) (any, error) {
 		if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, eris.Wrap(jwt.ErrSignatureInvalid, "unexpected signing method")
 		}
@@ -160,12 +139,10 @@ func (h *HorizonTokenService[T]) VerifyToken(ctx context.Context, value string) 
 	if err != nil {
 		return nil, eris.Wrap(err, "token parse failed")
 	}
-	parsedClaims, ok := tok.Claims.(T)
-	if !ok || !tok.Valid {
+
+	if !token.Valid {
 		return nil, eris.New("invalid token")
 	}
-	if rc := parsedClaims.GetRegisteredClaims(); rc.Issuer != h.name {
-		return nil, eris.New("invalid token issuer")
-	}
-	return &parsedClaims, nil
+
+	return &claim, nil
 }
