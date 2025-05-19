@@ -11,6 +11,7 @@ import (
 type EnvironmentService interface {
 	Get(key string, defaultValue any) any
 	GetString(key string, defaultValue string) string
+	GetByteSlice(key string, defaultValue string) []byte
 	GetBool(key string, defaultValue bool) bool
 	GetInt(key string, defaultValue int) int
 	GetInt32(key string, defaultValue int32) int32
@@ -39,6 +40,12 @@ func NewEnvironmentService(path string) EnvironmentService {
 	}
 	viper.AutomaticEnv()
 	return HorizonEnvironmentService{}
+}
+
+func (h HorizonEnvironmentService) GetByteSlice(key string, defaultValue string) []byte {
+	viper.SetDefault(key, defaultValue)
+	value := h.GetString(key, defaultValue)
+	return []byte(value)
 }
 
 // Get implements EnvironmentService.

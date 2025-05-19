@@ -11,7 +11,7 @@ import (
 
 func setupSecurityUtils() horizon.SecurityUtils {
 	env := horizon.NewEnvironmentService("../.env")
-	token := []byte(env.GetString("APP_TOKEN", ""))
+	token := env.GetByteSlice("APP_TOKEN", "")
 	return horizon.NewSecurityUtils(
 		env.GetUint32("PASSWORD_MEMORY", 65536),  // memory (e.g., 64MB)
 		env.GetUint32("PASSWORD_ITERATIONS", 3),  // iterations
