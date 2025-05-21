@@ -61,3 +61,10 @@ type SMTPServiceConfig struct {
 	Password string `env:"SMTP_PASSWORD"`
 	From     string `env:"SMTP_FROM"`
 }
+
+type RequestServiceConfig struct {
+	AppPort     int    `env:"APP_PORT"`
+	MetricsPort int    `env:"APP_METRICS_PORT"`
+	ClientURL   string `env:"APP_CLIENT_URL"`
+	ClientName  string `env:"APP_CLIENT_NAME"`
+}

@@ -19,6 +19,7 @@ import (
 
 type StorageService interface {
 	Run(ctx context.Context) error
+	Stop(ctx context.Context) error
 	Upload(ctx context.Context, file any, opts ProgressCallback) (*Storage, error)
 	UploadFromBinary(ctx context.Context, data []byte, opts ProgressCallback) (*Storage, error)
 	UploadFromHeader(ctx context.Context, hdr *multipart.FileHeader, opts ProgressCallback) (*Storage, error)
@@ -92,6 +93,12 @@ func (h *HorizonStorage) Run(ctx context.Context) error {
 		return eris.Wrapf(err, "failed to create bucket %s", h.storageBucket)
 	}
 	h.bucket = bucket
+	return nil
+}
+
+func (h *HorizonStorage) Stop(ctx context.Context) error {
+	h.b2Client = nil
+	h.bucket = nil
 	return nil
 }
 

@@ -18,18 +18,20 @@ type HorizonService struct {
 	OTP         horizon.OTPService
 	SMS         horizon.SMSService
 	SMTP        horizon.SMTPService
+	Request     horizon.APIService
 }
 
 type HorizonServiceConfig struct {
-	EnvironmentConfig *EnvironmentServiceConfig
-	SQLConfig         *SQLServiceConfig
-	StorageConfig     *StorageServiceConfig
-	CacheConfig       *CacheServiceConfig
-	BrokerConfig      *BrokerServiceConfig
-	SecurityConfig    *SecurityServiceConfig
-	OTPServiceConfig  *OTPServiceConfig
-	SMSServiceConfig  *SMSServiceConfig
-	SMTPServiceConfig *SMTPServiceConfig
+	EnvironmentConfig    *EnvironmentServiceConfig
+	SQLConfig            *SQLServiceConfig
+	StorageConfig        *StorageServiceConfig
+	CacheConfig          *CacheServiceConfig
+	BrokerConfig         *BrokerServiceConfig
+	SecurityConfig       *SecurityServiceConfig
+	OTPServiceConfig     *OTPServiceConfig
+	SMSServiceConfig     *SMSServiceConfig
+	SMTPServiceConfig    *SMTPServiceConfig
+	RequestServiceConfig *RequestServiceConfig
 }
 
 func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
@@ -41,6 +43,21 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 	}
 
 	service.Environment = horizon.NewEnvironmentService(env)
+	if cfg.RequestServiceConfig != nil {
+		service.Request = horizon.NewHorizonAPIService(
+			cfg.RequestServiceConfig.AppPort,
+			cfg.RequestServiceConfig.MetricsPort,
+			cfg.RequestServiceConfig.ClientURL,
+			cfg.RequestServiceConfig.ClientName,
+		)
+	} else {
+		service.Request = horizon.NewHorizonAPIService(
+			service.Environment.GetInt("APP_PORT", 8000),
+			service.Environment.GetInt("APP_METRICS_PORT", 8001),
+			service.Environment.GetString("APP_CLIENT_URL", "http://localhost:3000"),
+			service.Environment.GetString("APP_CLIENT_NAME", "test-client"),
+		)
+	}
 	if cfg.SecurityConfig != nil {
 		service.Security = horizon.NewSecurityService(
 			cfg.SecurityConfig.Memory,
@@ -177,10 +194,9 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 	return service
 }
 
-func (h *HorizonService) Run(ctx context.Context, port int) error {
+func (h *HorizonService) Run(ctx context.Context) error {
 
 	if h.Cron != nil {
-
 		if err := h.Cron.Run(ctx); err != nil {
 			return err
 		}
@@ -190,7 +206,6 @@ func (h *HorizonService) Run(ctx context.Context, port int) error {
 			return err
 		}
 	}
-
 	if h.Cache != nil {
 		if err := h.Cache.Run(ctx); err != nil {
 			return err
@@ -199,13 +214,11 @@ func (h *HorizonService) Run(ctx context.Context, port int) error {
 			return err
 		}
 	}
-
 	if h.Storage != nil {
 		if err := h.Storage.Run(ctx); err != nil {
 			return err
 		}
 	}
-
 	if h.Database != nil {
 		if err := h.Database.Run(ctx); err != nil {
 			return err
@@ -229,6 +242,56 @@ func (h *HorizonService) Run(ctx context.Context, port int) error {
 	}
 	if h.SMTP != nil {
 		if err := h.SMTP.Run(ctx); err != nil {
+			return err
+		}
+	}
+	if h.Request != nil {
+		if err := h.Request.Run(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *HorizonService) Stop(ctx context.Context) error {
+	if h.Request != nil {
+		if err := h.Request.Stop(ctx); err != nil {
+			return err
+		}
+	}
+	if h.SMTP != nil {
+		if err := h.SMTP.Stop(ctx); err != nil {
+			return err
+		}
+	}
+	if h.SMS != nil {
+		if err := h.SMS.Stop(ctx); err != nil {
+			return err
+		}
+	}
+
+	if h.Cron != nil {
+		if err := h.Cron.Stop(ctx); err != nil {
+			return err
+		}
+	}
+	if h.Broker != nil {
+		if err := h.Broker.Stop(ctx); err != nil {
+			return err
+		}
+	}
+	if h.Cache != nil {
+		if err := h.Cache.Stop(ctx); err != nil {
+			return err
+		}
+	}
+	if h.Storage != nil {
+		if err := h.Storage.Stop(ctx); err != nil {
+			return err
+		}
+	}
+	if h.Database != nil {
+		if err := h.Database.Stop(ctx); err != nil {
 			return err
 		}
 	}
