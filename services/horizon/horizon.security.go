@@ -33,6 +33,8 @@ type SecurityService interface {
 
 	// Decrypt performs AES decryption on ciphertext
 	Decrypt(ctx context.Context, ciphertext string) (string, error)
+
+	GenerateUUIDv5(ctx context.Context, name string) (string, error)
 }
 
 // HorizonSecurity is a concrete implementation of SecurityUtils
@@ -176,4 +178,14 @@ func (h *HorizonSecurity) VerifyPassword(ctx context.Context, hash string, passw
 		return true, nil
 	}
 	return false, nil
+}
+
+func (h *HorizonSecurity) GenerateUUIDv5(ctx context.Context, name string) (string, error) {
+	namespace := uuid.NameSpaceX500
+	if name == "" {
+		return "", errors.New("name cannot be empty")
+	}
+
+	uuid5 := uuid.NewSHA1(namespace, []byte(name))
+	return uuid5.String(), nil
 }

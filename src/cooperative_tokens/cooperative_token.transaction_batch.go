@@ -1,6 +1,9 @@
 package cooperative_tokens
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/lands-horizon/horizon-server/src"
@@ -22,10 +25,18 @@ type TransactionBatchToken struct {
 	Token *horizon.HorizonTokenService[TransactionBatchClaim]
 }
 
-func NewTransactionBatchToken(provider *src.Provider) *TransactionBatchToken {
-	service := &horizon.HorizonTokenService[TransactionBatchClaim]{
-		Name:   provider.Service.Environment.GetString("APP_NAME", ""),
-		Secret: provider.Service.Environment.GetByteSlice("APP_TOKEN", ""),
+func NewTransactionBatchToken(provider *src.Provider) (*TransactionBatchToken, error) {
+
+	appName := provider.Service.Environment.GetString("APP_NAME", "")
+	appToken := provider.Service.Environment.GetString("APP_TOKEN", "")
+
+	token, err := provider.Service.Security.GenerateUUIDv5(context.Background(), appToken+"-transaction-batch")
+	if err != nil {
+		return nil, err
 	}
-	return &TransactionBatchToken{Token: service}
+	service := &horizon.HorizonTokenService[TransactionBatchClaim]{
+		Name:   fmt.Sprintf("%s-%s", "X-SECURE-TRANSACTION-BATCH", appName),
+		Secret: []byte(token),
+	}
+	return &TransactionBatchToken{Token: service}, nil
 }

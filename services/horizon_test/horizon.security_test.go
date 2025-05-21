@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/stretchr/testify/assert"
 )
@@ -67,4 +68,22 @@ func TestEncryptAndDecrypt(t *testing.T) {
 	decrypted, err := sec.Decrypt(ctx, encrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, plaintext, decrypted)
+}
+
+func TestGenerateUUIDv5(t *testing.T) {
+	sec := setupSecurityUtils()
+	ctx := context.Background()
+
+	name := "example.com"
+	uuid5, err := sec.GenerateUUIDv5(ctx, name)
+	assert.NoError(t, err)
+	assert.Len(t, uuid5, 36)
+
+	parsed, err := uuid.Parse(uuid5)
+	assert.NoError(t, err)
+	assert.Equal(t, uuid.Version(5), parsed.Version())
+
+	_, err = sec.GenerateUUIDv5(ctx, "")
+	assert.Error(t, err)
+	assert.Equal(t, "name cannot be empty", err.Error())
 }

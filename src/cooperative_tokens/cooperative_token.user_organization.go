@@ -1,6 +1,9 @@
 package cooperative_tokens
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/lands-horizon/horizon-server/src"
@@ -22,10 +25,18 @@ type UserOrganizatonToken struct {
 	Token *horizon.HorizonTokenService[UserOrganizatonClaim]
 }
 
-func NewUserOrganizatonToken(provider *src.Provider) *UserOrganizatonToken {
-	service := &horizon.HorizonTokenService[UserOrganizatonClaim]{
-		Name:   provider.Service.Environment.GetString("APP_NAME", ""),
-		Secret: provider.Service.Environment.GetByteSlice("APP_TOKEN", ""),
+func NewUserOrganizatonToken(provider *src.Provider) (*UserOrganizatonToken, error) {
+	appName := provider.Service.Environment.GetString("APP_NAME", "")
+	appToken := provider.Service.Environment.GetString("APP_TOKEN", "")
+
+	token, err := provider.Service.Security.GenerateUUIDv5(context.Background(), appToken+"user-organization")
+	if err != nil {
+		return nil, err
 	}
-	return &UserOrganizatonToken{Token: service}
+
+	service := &horizon.HorizonTokenService[UserOrganizatonClaim]{
+		Name:   fmt.Sprintf("%s-%s", "X-SECURE-USER-ORGANIZATION", appName),
+		Secret: []byte(token),
+	}
+	return &UserOrganizatonToken{Token: service}, nil
 }
