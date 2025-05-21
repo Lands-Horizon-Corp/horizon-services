@@ -50,7 +50,7 @@ type Storage struct {
 	FileName   string // Original file name
 	FileSize   int64  // File size in bytes
 	FileType   string // MIME type
-	StorageKey string // Unique storage identifier
+	StorageKey string // Unique Storage identifier
 	URL        string // Public access URL
 	BucketName string // Storage bucket name
 	Status     string // Upload status: pending, cancelled, corrupt, completed, progress
@@ -58,11 +58,11 @@ type Storage struct {
 }
 
 // ProgressCallback defines a function type for upload progress updates
-type ProgressCallback func(progress int64, total int64, storage *Storage)
+type ProgressCallback func(progress int64, total int64, Storage *Storage)
 
-// StorageService defines the interface for cloud storage operations
+// StorageService defines the interface for cloud Storage operations
 type StorageService interface {
-	// Run initializes connections to storage providers
+	// Run initializes connections to Storage providers
 	Run(ctx context.Context) error
 
 	// Upload implements StorageService and delegates based on input type:
@@ -81,10 +81,10 @@ type StorageService interface {
 	UploadFromPath(ctx context.Context, path string, opts ProgressCallback) (*Storage, error)
 
 	// GeneratePresignedURL creates a time-limited access URL for a stored file
-	GeneratePresignedURL(ctx context.Context, storage *Storage, expiry time.Duration) (string, error)
+	GeneratePresignedURL(ctx context.Context, Storage *Storage, expiry time.Duration) (string, error)
 
-	// DeleteFile permanently removes a file from storage
-	DeleteFile(ctx context.Context, storage *Storage) error
+	// DeleteFile permanently removes a file from Storage
+	DeleteFile(ctx context.Context, Storage *Storage) error
 
 	// GenerateUniqueName creates a collision-resistant filename
 	GenerateUniqueName(ctx context.Context, originalName string) (string, error)
@@ -95,7 +95,7 @@ type progressReader struct {
 	callback  ProgressCallback
 	total     int64
 	readSoFar int64
-	storage   *Storage
+	Storage   *Storage
 }
 
 func (pr *progressReader) Read(p []byte) (int, error) {
@@ -106,9 +106,9 @@ func (pr *progressReader) Read(p []byte) (int, error) {
 		if percent > 100 {
 			percent = 100
 		}
-		pr.storage.Progress = percent
+		pr.Storage.Progress = percent
 		if pr.callback != nil {
-			pr.callback(percent, 100, pr.storage)
+			pr.callback(percent, 100, pr.Storage)
 		}
 	}
 	return n, err
@@ -123,7 +123,7 @@ type HorizonStorage struct {
 	storageBucket     string
 	storageAPIPort    int16
 	maxFileSize       int64
-	storage           *minio.Client
+	Storage           *minio.Client
 }
 
 func NewHorizonStorageService(
@@ -146,7 +146,7 @@ func NewHorizonStorageService(
 		storageBucket:     storageBucket,
 		storageAPIPort:    storageAPIPort,
 		maxFileSize:       maxFileSize,
-		storage:           nil,
+		Storage:           nil,
 	}
 }
 
@@ -167,7 +167,7 @@ func (h HorizonStorage) Run(ctx context.Context) error {
 		return eris.Wrap(err, "failed to initialize MinIO client")
 	}
 
-	h.storage = client
+	h.Storage = client
 	exists, err := client.BucketExists(ctx, h.storageBucket)
 	if err != nil {
 		return eris.Wrap(err, "failed to check bucket exists")
@@ -182,29 +182,29 @@ func (h HorizonStorage) Run(ctx context.Context) error {
 }
 
 // DeleteFile implements StorageService.
-func (h HorizonStorage) DeleteFile(ctx context.Context, storage *Storage) error {
-	if h.storage == nil {
+func (h HorizonStorage) DeleteFile(ctx context.Context, Storage *Storage) error {
+	if h.Storage == nil {
 		return eris.New("not initialized")
 	}
-	if strings.TrimSpace(storage.StorageKey) == "" {
+	if strings.TrimSpace(Storage.StorageKey) == "" {
 		return eris.New("empty key")
 	}
-	err := h.storage.RemoveObject(ctx, storage.BucketName, storage.StorageKey, minio.RemoveObjectOptions{})
+	err := h.Storage.RemoveObject(ctx, Storage.BucketName, Storage.StorageKey, minio.RemoveObjectOptions{})
 	if err != nil {
-		return eris.Wrapf(err, "delete %s failed", storage.FileName)
+		return eris.Wrapf(err, "delete %s failed", Storage.FileName)
 	}
 	return nil
 }
 
 // GeneratePresignedURL implements StorageService.
-func (h HorizonStorage) GeneratePresignedURL(ctx context.Context, storage *Storage, expiry time.Duration) (string, error) {
-	if h.storage == nil {
+func (h HorizonStorage) GeneratePresignedURL(ctx context.Context, Storage *Storage, expiry time.Duration) (string, error) {
+	if h.Storage == nil {
 		return "", eris.New("not initialized")
 	}
-	if storage.StorageKey == "" {
-		return "", eris.New("storage key do not exists")
+	if Storage.StorageKey == "" {
+		return "", eris.New("Storage key do not exists")
 	}
-	u, err := h.storage.PresignedGetObject(ctx, storage.BucketName, storage.StorageKey, 24*time.Hour, nil)
+	u, err := h.Storage.PresignedGetObject(ctx, Storage.BucketName, Storage.StorageKey, 24*time.Hour, nil)
 	if err != nil {
 		return "", eris.Wrap(err, "presign failed")
 	}
@@ -213,7 +213,7 @@ func (h HorizonStorage) GeneratePresignedURL(ctx context.Context, storage *Stora
 
 // GenerateUniqueName implements StorageService.
 func (h HorizonStorage) GenerateUniqueName(ctx context.Context, name string) (string, error) {
-	if h.storage == nil {
+	if h.Storage == nil {
 		return "", eris.New("not initialized")
 	}
 	if name == "" {
@@ -241,8 +241,8 @@ func (h *HorizonStorage) Upload(
 
 // UploadFromBinary implements StorageService.
 func (h HorizonStorage) UploadFromBinary(ctx context.Context, data []byte, callback ProgressCallback) (*Storage, error) {
-	if h.storage == nil {
-		return nil, eris.New("storage not initialized")
+	if h.Storage == nil {
+		return nil, eris.New("Storage not initialized")
 	}
 
 	// Prepare reader and size
@@ -259,7 +259,7 @@ func (h HorizonStorage) UploadFromBinary(ctx context.Context, data []byte, callb
 	if err != nil {
 		return nil, err
 	}
-	storage := &Storage{
+	Storage := &Storage{
 		FileName: fileName,
 		FileSize: size,
 		FileType: contentType,
@@ -270,10 +270,10 @@ func (h HorizonStorage) UploadFromBinary(ctx context.Context, data []byte, callb
 		reader:   reader,
 		callback: callback,
 		total:    size,
-		storage:  storage,
+		Storage:  Storage,
 	}
 
-	uploadInfo, err := h.storage.PutObject(
+	uploadInfo, err := h.Storage.PutObject(
 		ctx,
 		h.storageBucket,
 		fileName,
@@ -286,28 +286,28 @@ func (h HorizonStorage) UploadFromBinary(ctx context.Context, data []byte, callb
 	}
 
 	// Update record
-	storage.StorageKey = uploadInfo.Key
-	storage.BucketName = h.storageBucket
+	Storage.StorageKey = uploadInfo.Key
+	Storage.BucketName = h.storageBucket
 
 	// Generate URL
-	url, err := h.GeneratePresignedURL(ctx, storage, 5*time.Minute)
+	url, err := h.GeneratePresignedURL(ctx, Storage, 5*time.Minute)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to generate presigned URL")
 	}
 
-	storage.URL = url
-	storage.Status = "completed"
-	storage.Progress = uploadInfo.Size
+	Storage.URL = url
+	Storage.Status = "completed"
+	Storage.Progress = uploadInfo.Size
 
-	return storage, nil
+	return Storage, nil
 
 }
 
 // UploadFromHeader implements StorageService.
 func (h HorizonStorage) UploadFromHeader(ctx context.Context, file *multipart.FileHeader, callback ProgressCallback) (*Storage, error) {
-	// Ensure storage client is initialized
-	if h.storage == nil {
-		return nil, eris.New("storage not initialized")
+	// Ensure Storage client is initialized
+	if h.Storage == nil {
+		return nil, eris.New("Storage not initialized")
 	}
 	src, err := file.Open()
 	if err != nil {
@@ -324,41 +324,41 @@ func (h HorizonStorage) UploadFromHeader(ctx context.Context, file *multipart.Fi
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to generate unique name")
 	}
-	storage := &Storage{
+	Storage := &Storage{
 		FileName: fileName,
 		FileSize: file.Size,
 		FileType: contentType,
 		Status:   "progress",
 	}
 
-	pr := &progressReader{reader: src, callback: callback, total: file.Size, storage: storage}
-	info, err := h.storage.PutObject(ctx, h.storageBucket, fileName, pr, file.Size, minio.PutObjectOptions{ContentType: contentType})
+	pr := &progressReader{reader: src, callback: callback, total: file.Size, Storage: Storage}
+	info, err := h.Storage.PutObject(ctx, h.storageBucket, fileName, pr, file.Size, minio.PutObjectOptions{ContentType: contentType})
 	if err != nil {
 		return nil, eris.Wrapf(err, "upload %s failed", file.Filename)
 	}
 
-	// Update storage record
-	storage.StorageKey = info.Key
-	storage.BucketName = h.storageBucket
+	// Update Storage record
+	Storage.StorageKey = info.Key
+	Storage.BucketName = h.storageBucket
 
 	// Generate presigned URL
-	url, err := h.GeneratePresignedURL(ctx, storage, 5*time.Minute)
+	url, err := h.GeneratePresignedURL(ctx, Storage, 5*time.Minute)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to generate presigned URL")
 	}
 
-	storage.URL = url
-	storage.Status = "completed"
-	storage.Progress = info.Size
-	return storage, nil
+	Storage.URL = url
+	Storage.Status = "completed"
+	Storage.Progress = info.Size
+	return Storage, nil
 }
 
 // UploadFromPath implements StorageService.
 func (h *HorizonStorage) UploadFromPath(ctx context.Context, path string, callback ProgressCallback,
 ) (*Storage, error) {
-	// Ensure storage client is initialized
-	if h.storage == nil {
-		return nil, eris.New("storage not initialized")
+	// Ensure Storage client is initialized
+	if h.Storage == nil {
+		return nil, eris.New("Storage not initialized")
 	}
 
 	// Validate and clean path
@@ -394,8 +394,8 @@ func (h *HorizonStorage) UploadFromPath(ctx context.Context, path string, callba
 		return nil, eris.Wrap(err, "failed to generate unique name")
 	}
 
-	// Prepare storage record
-	storage := &Storage{
+	// Prepare Storage record
+	Storage := &Storage{
 		FileName: fileName,
 		FileSize: info.Size(),
 		FileType: contentType,
@@ -407,11 +407,11 @@ func (h *HorizonStorage) UploadFromPath(ctx context.Context, path string, callba
 		reader:   file,
 		callback: callback,
 		total:    info.Size(),
-		storage:  storage,
+		Storage:  Storage,
 	}
 
 	// Upload to MinIO
-	uploadInfo, err := h.storage.PutObject(
+	uploadInfo, err := h.Storage.PutObject(
 		ctx,
 		h.storageBucket,
 		fileName,
@@ -423,19 +423,19 @@ func (h *HorizonStorage) UploadFromPath(ctx context.Context, path string, callba
 		return nil, eris.Wrap(err, "failed to upload file")
 	}
 
-	// Update storage record
-	storage.StorageKey = uploadInfo.Key
-	storage.BucketName = h.storageBucket
+	// Update Storage record
+	Storage.StorageKey = uploadInfo.Key
+	Storage.BucketName = h.storageBucket
 
 	// Generate presigned URL
-	url, err := h.GeneratePresignedURL(ctx, storage, 5*time.Minute)
+	url, err := h.GeneratePresignedURL(ctx, Storage, 5*time.Minute)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to generate presigned URL")
 	}
 
-	storage.URL = url
-	storage.Status = "completed"
-	storage.Progress = uploadInfo.Size
+	Storage.URL = url
+	Storage.Status = "completed"
+	Storage.Progress = uploadInfo.Size
 
-	return storage, nil
+	return Storage, nil
 }

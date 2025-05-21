@@ -43,6 +43,7 @@ x-env: &horizon-environment-variables
     STORAGE_BUCKET: "${STORAGE_BUCKET}"
     STORAGE_API_PORT: "${STORAGE_API_PORT}"
     STORAGE_CONSOLE_PORT: "${STORAGE_CONSOLE_PORT}"
+    STORAGE_MAX_SIZE: "${STORAGE_MAX_SIZE}"
     NATS_HOST: "${NATS_HOST}"
     NATS_CLIENT_PORT: "${NATS_CLIENT_PORT}"
     NATS_MONITOR_PORT: "${NATS_MONITOR_PORT}"
@@ -67,7 +68,6 @@ services:
       - "${APP_METRICS_PORT}:${APP_METRICS_PORT}"
     volumes:
       - ./:/app
-
     <<: *horizon-environment-variables
     depends_on:
       - postgres
