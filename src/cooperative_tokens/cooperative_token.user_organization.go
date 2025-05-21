@@ -29,7 +29,7 @@ func NewUserOrganizatonToken(provider *src.Provider) (*UserOrganizatonToken, err
 	appName := provider.Service.Environment.GetString("APP_NAME", "")
 	appToken := provider.Service.Environment.GetString("APP_TOKEN", "")
 
-	token, err := provider.Service.Security.GenerateUUIDv5(context.Background(), appToken+"user-organization")
+	token, err := provider.Service.Security.GenerateUUIDv5(context.Background(), appToken+"-user-organization")
 	if err != nil {
 		return nil, err
 	}
