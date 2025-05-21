@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/lands-horizon/horizon-server/horizon"
+	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/stretchr/testify/assert"
 )
 

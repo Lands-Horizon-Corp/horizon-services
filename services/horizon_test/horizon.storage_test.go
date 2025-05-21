@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lands-horizon/horizon-server/horizon"
+	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,7 +72,7 @@ func cleanupBucket(t *testing.T, svc *horizon.HorizonStorage) {
 
 // Test 1: Successful Initialization
 func TestRun(t *testing.T) {
-	env := horizon.NewEnvironmentService("../.env")
+	env := horizon.NewEnvironmentService("../../.env")
 	svc := setupStorageService(t)
 	fmt.Println(env.GetString("STORAGE_HOST", "localhost"))
 	// fmt.Println(svc)

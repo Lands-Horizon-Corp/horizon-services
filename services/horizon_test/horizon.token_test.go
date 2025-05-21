@@ -10,10 +10,11 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
-	"github.com/lands-horizon/horizon-server/horizon"
+	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/stretchr/testify/assert"
 )
 
+// go test ./services/horizon_test/horizon.token_test.go
 // A minimal claim struct for testing
 type TestClaim struct {
 	Username string `json:"username"`
@@ -25,7 +26,7 @@ func (c TestClaim) GetRegisteredClaims() *jwt.RegisteredClaims {
 }
 
 func setupService() *horizon.HorizonTokenService[TestClaim] {
-	env := horizon.NewEnvironmentService("../.env")
+	env := horizon.NewEnvironmentService("../../../.env")
 	token := []byte(env.GetString("APP_TOKEN", ""))
 	name := env.GetString("APP_NAME", "")
 	return &horizon.HorizonTokenService[TestClaim]{
@@ -126,7 +127,7 @@ func TestVerifyToken_BadBase64(t *testing.T) {
 }
 
 func TestVerifyToken_BadSignature(t *testing.T) {
-	env := horizon.NewEnvironmentService("../.env")
+	env := horizon.NewEnvironmentService("../../.env")
 	name := env.GetString("APP_NAME", "")
 
 	ctx := context.Background()
