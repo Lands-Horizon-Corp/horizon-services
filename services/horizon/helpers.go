@@ -1,13 +1,14 @@
 package horizon
 
 import (
-	"crypto/rand"
 	"errors"
+	"math/rand"
 	"net/mail"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func isValidFilePath(p string) error {
@@ -76,4 +77,28 @@ func IsValidURL(rawURL string) bool {
 	}
 
 	return true
+}
+
+func GenerateRandomDigits(size int) (int, error) {
+	if size > 8 {
+		return 0, errors.New("size must not exceed 8 digits")
+	}
+	if size <= 0 {
+		return 0, errors.New("size must be a positive integer")
+	}
+
+	min := intPow(10, size-1)
+	max := intPow(10, size) - 1
+
+	// Use a local source (deterministic if seeded)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return r.Intn(max-min+1) + min, nil
+}
+
+func intPow(a, b int) int {
+	result := 1
+	for i := 0; i < b; i++ {
+		result *= a
+	}
+	return result
 }
