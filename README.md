@@ -1,36 +1,51 @@
+## 🛠 Prerequisites
 
-#### Prerequisites
+Before you begin, make sure the following tools are installed:
 
-Make sure you have the following installed before proceeding:
+* **Go 1.24.2 or later**: [Download Go](https://golang.org/dl/)
+* **Docker & Docker Compose**: [Download Docker Desktop](https://www.docker.com/products/docker-desktop)
 
-* **Go 1.24.2**: Ensure you have Go version 1.24.2 or later installed. You can download it from [here](https://golang.org/dl/).
-* **Docker CLI**: Install Docker and Docker Compose. You can download Docker Desktop from [here](https://www.docker.com/products/docker-desktop).
+---
 
-#### Running Tests
+## 🚀 Getting Started
 
-To run tests inside Docker using `docker exec`, execute the following command:
-You can also do this on `terminal` if *golang 1.24.2* is installed and NATS is running inside docker
+Follow these steps to set up and run the project locally:
 
-**Test can take 1 to 5 mins**
+1. **Clone the Repository**
 
-```bash
-go test ./services/horizon_test
-```
+   ```bash
+   git clone <your-repo-url>
+   cd <your-project-directory>
+   ```
 
-#### Starting Docker
+2. **Copy and Configure Environment Variables**
 
-To start Docker with your project:
+   ```bash
+   cp .env.example .env
+   ```
 
-```bash
-docker compose up --build -d
-```
+   Fill in the required environment values provided by the admin.
 
-#### Starting the Server
+3. **Start Docker Services**
 
-To start the server locally:
+   ```bash
+   docker compose up --build -d
+   ```
 
-```bash
-go run main.go
-```
+4. **Run Tests**
 
-Including these instructions will help ensure that anyone trying to work with your project has the necessary tools and versions installed to get started quickly.
+   Run the tests inside the terminal. Make sure NATS is running in Docker.
+
+   ```bash
+   go test ./services/horizon_test
+   ```
+
+   > ⏳ *Tests may take 1 to 5 minutes to complete.*
+
+5. **Run the Server**
+
+   ```bash
+   go run main.go
+   ```
+
+   This will also **auto-migrate the database** and **seed** the initial data.
