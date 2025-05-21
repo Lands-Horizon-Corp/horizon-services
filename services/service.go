@@ -16,6 +16,8 @@ type HorizonService struct {
 	Cron        horizon.SchedulerService
 	Security    horizon.SecurityService
 	OTP         horizon.OTPService
+	SMS         horizon.SMSService
+	SMTP        horizon.SMTPService
 }
 
 type HorizonServiceConfig struct {
@@ -26,10 +28,19 @@ type HorizonServiceConfig struct {
 	BrokerConfig      *BrokerServiceConfig
 	SecurityConfig    *SecurityServiceConfig
 	OTPServiceConfig  *OTPServiceConfig
+	SMSServiceConfig  *SMSServiceConfig
+	SMTPServiceConfig *SMTPServiceConfig
 }
 
 func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 	service := &HorizonService{}
+
+	env := "./.env"
+	if cfg.EnvironmentConfig != nil {
+		env = cfg.EnvironmentConfig.Path
+	}
+
+	service.Environment = horizon.NewEnvironmentService(env)
 	if cfg.SecurityConfig != nil {
 		service.Security = horizon.NewSecurityService(
 			cfg.SecurityConfig.Memory,
@@ -39,7 +50,17 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 			cfg.SecurityConfig.KeyLength,
 			cfg.SecurityConfig.Secret,
 		)
+	} else {
+		service.Security = horizon.NewSecurityService(
+			service.Environment.GetUint32("PASSWORD_MEMORY", 65536),
+			service.Environment.GetUint32("PASSWORD_ITERATIONS", 4),
+			service.Environment.GetUint8("PASSWORD_PARALLELISM", 4),
+			service.Environment.GetUint32("PASSWORD_SALT_LENGTH", 32),
+			service.Environment.GetUint32("PASSWORD_KEY_LENGTH", 32),
+			service.Environment.GetByteSlice("PASSWORD_SECRET", "secret"),
+		)
 	}
+
 	if cfg.EnvironmentConfig != nil {
 		service.Environment = horizon.NewEnvironmentService(
 			cfg.EnvironmentConfig.Path,
@@ -52,6 +73,13 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 			cfg.SQLConfig.MaxOpenConn,
 			cfg.SQLConfig.MaxLifetime,
 		)
+	} else {
+		service.Database = horizon.NewGormDatabase(
+			service.Environment.GetString("DATABASE_URL", ""),
+			service.Environment.GetInt("DB_MAX_IDLE_CONN", 10),
+			service.Environment.GetInt("DB_MAX_OPEN_CONN", 100),
+			service.Environment.GetDuration("DB_MAX_LIFETIME", 0),
+		)
 	}
 
 	if cfg.StorageConfig != nil {
@@ -62,6 +90,14 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 			cfg.StorageConfig.Bucket,
 			cfg.StorageConfig.MaxFilezize,
 		)
+	} else {
+		service.Storage = horizon.NewHorizonStorageService(
+			service.Environment.GetString("STORAGE_ACCESS_KEY", ""),
+			service.Environment.GetString("STORAGE_SECRET_KEY", ""),
+			service.Environment.GetString("STORAGE_PREFIX", ""),
+			service.Environment.GetString("STORAGE_BUCKET", ""),
+			service.Environment.GetInt64("STORAGE_MAX_SIZE", 0),
+		)
 	}
 
 	if cfg.CacheConfig != nil {
@@ -71,6 +107,13 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 			cfg.CacheConfig.Username,
 			cfg.CacheConfig.Port,
 		)
+	} else {
+		service.Cache = horizon.NewHorizonCache(
+			service.Environment.GetString("REDIS_HOST", ""),
+			service.Environment.GetString("REDIS_PASSWORD", ""),
+			service.Environment.GetString("REDIS_USERNAME", ""),
+			service.Environment.GetInt("REDIS_PORT", 6379),
+		)
 	}
 
 	if cfg.BrokerConfig != nil {
@@ -78,12 +121,55 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 			cfg.BrokerConfig.Host,
 			cfg.BrokerConfig.Port,
 		)
+	} else {
+		service.Broker = horizon.NewHorizonMessageBroker(
+			service.Environment.GetString("NATS_HOST", "localhost"),
+			service.Environment.GetInt("NATS_CLIENT_PORT", 4222),
+		)
 	}
 	if cfg.OTPServiceConfig != nil {
 		service.OTP = horizon.NewHorizonOTP(
 			cfg.OTPServiceConfig.Secret,
 			service.Cache,
 			service.Security,
+		)
+	} else {
+		service.OTP = horizon.NewHorizonOTP(
+			service.Environment.GetByteSlice("OTP_SECRET", "secret-otp"),
+			service.Cache,
+			service.Security,
+		)
+	}
+	if cfg.SMSServiceConfig != nil {
+		service.SMS = horizon.NewHorizonSMS(
+			cfg.SMSServiceConfig.AccountSID,
+			cfg.SMSServiceConfig.AuthToken,
+			cfg.SMSServiceConfig.Sender,
+			cfg.SMSServiceConfig.MaxChars,
+		)
+	} else {
+		service.SMS = horizon.NewHorizonSMS(
+			service.Environment.GetString("TWILIO_ACCOUNT_SID", ""),
+			service.Environment.GetString("TWILIO_AUTH_TOKEN", ""),
+			service.Environment.GetString("TWILIO_SENDER", ""),
+			service.Environment.GetInt32("TWILIO_MAX_CHARACTERS", 160),
+		)
+	}
+	if cfg.SMTPServiceConfig != nil {
+		service.SMTP = horizon.NewHorizonSMTP(
+			cfg.SMTPServiceConfig.Host,
+			cfg.SMTPServiceConfig.Port,
+			cfg.SMTPServiceConfig.Username,
+			cfg.SMTPServiceConfig.Password,
+			cfg.SMTPServiceConfig.From,
+		)
+	} else {
+		service.SMTP = horizon.NewHorizonSMTP(
+			service.Environment.GetString("SMTP_HOST", ""),
+			service.Environment.GetInt("SMTP_PORT", 587),
+			service.Environment.GetString("SMTP_USERNAME", ""),
+			service.Environment.GetString("SMTP_PASSWORD", ""),
+			service.Environment.GetString("SMTP_FROM", ""),
 		)
 	}
 	service.Cron = horizon.NewHorizonSchedule()
@@ -93,6 +179,7 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 func (h *HorizonService) Run(ctx context.Context) error {
 
 	if h.Cron != nil {
+
 		if err := h.Cron.Run(ctx); err != nil {
 			return err
 		}
@@ -134,5 +221,16 @@ func (h *HorizonService) Run(ctx context.Context) error {
 			return eris.New("OTP service requires a security service")
 		}
 	}
+	if h.SMS != nil {
+		if err := h.SMS.Run(ctx); err != nil {
+			return err
+		}
+	}
+	if h.SMTP != nil {
+		if err := h.SMTP.Run(ctx); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

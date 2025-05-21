@@ -10,9 +10,9 @@ type EnvironmentServiceConfig struct {
 
 type SQLServiceConfig struct {
 	DSN         string        `env:"DATABASE_URL"`
-	MaxIdleConn int           `env:"DB_MAX_IDLE_CONN" envDefault:"10"`
-	MaxOpenConn int           `env:"DB_MAX_OPEN_CONN" envDefault:"100"`
-	MaxLifetime time.Duration `env:"DB_MAX_LIFETIME" envDefault:"1h"`
+	MaxIdleConn int           `env:"DB_MAX_IDLE_CONN"`
+	MaxOpenConn int           `env:"DB_MAX_OPEN_CONN"`
+	MaxLifetime time.Duration `env:"DB_MAX_LIFETIME"`
 }
 
 type StorageServiceConfig struct {
@@ -20,7 +20,7 @@ type StorageServiceConfig struct {
 	SecretKey   string `env:"STORAGE_SECRET_KEY"`
 	Bucket      string `env:"STORAGE_BUCKET"`
 	Prefix      string `env:"STORAGE_PREFIX"`
-	MaxFilezize int64  `env:"STORAGE_MAX_SIZE" envDefault:"10485760"`
+	MaxFilezize int64  `env:"STORAGE_MAX_SIZE"`
 }
 
 type CacheServiceConfig struct {
@@ -46,4 +46,18 @@ type SecurityServiceConfig struct {
 
 type OTPServiceConfig struct {
 	Secret []byte `env:"OTP_SECRET"`
+}
+
+type SMSServiceConfig struct {
+	AccountSID string `env:"TWILIO_ACCOUNT_SID"`
+	AuthToken  string `env:"TWILIO_AUTH_TOKEN"`
+	Sender     string `env:"TWILIO_SENDER"`
+	MaxChars   int32  `env:"TWILIO_MAX_CHARACTERS"`
+}
+type SMTPServiceConfig struct {
+	Host     string `env:"SMTP_HOST"`
+	Port     int    `env:"SMTP_PORT"`
+	Username string `env:"SMTP_USERNAME"`
+	Password string `env:"SMTP_PASSWORD"`
+	From     string `env:"SMTP_FROM"`
 }
