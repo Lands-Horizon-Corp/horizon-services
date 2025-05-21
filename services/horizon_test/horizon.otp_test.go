@@ -10,10 +10,10 @@ import (
 
 // go test ./services/horizon_test/horizon.otp_test.go
 // --- Setup helpers ---
-func setupSecurityUtilsOTP() horizon.SecurityUtils {
+func setupSecurityUtilsOTP() horizon.SecurityService {
 	env := horizon.NewEnvironmentService("../../.env")
 	token := env.GetByteSlice("APP_TOKEN", "")
-	return horizon.NewSecurityUtils(
+	return horizon.NewSecurityService(
 		env.GetUint32("PASSWORD_MEMORY", 65536),  // memory (e.g., 64MB)
 		env.GetUint32("PASSWORD_ITERATIONS", 3),  // iterations
 		env.GetUint8("PASSWORD_PARALLELISM", 2),  // parallelism

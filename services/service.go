@@ -7,23 +7,41 @@ import (
 )
 
 type HorizonService struct {
-	Database horizon.SQLDatabaseService
-	Storage  horizon.StorageService
-	Cache    horizon.CacheService
-	Broker   horizon.MessageBrokerService
-	Cron     horizon.SchedulerService
+	Environment horizon.EnvironmentService
+	Database    horizon.SQLDatabaseService
+	Storage     horizon.StorageService
+	Cache       horizon.CacheService
+	Broker      horizon.MessageBrokerService
+	Cron        horizon.SchedulerService
+	Security    horizon.SecurityService
 }
 
 type HorizonServiceConfig struct {
-	SQLConfig     *SQLServiceConfig
-	StorageConfig *StorageServiceConfig
-	CacheConfig   *CacheServiceConfig
-	BrokerConfig  *BrokerServiceConfig
+	EnvironmentConfig *EnvironmentServiceConfig
+	SQLConfig         *SQLServiceConfig
+	StorageConfig     *StorageServiceConfig
+	CacheConfig       *CacheServiceConfig
+	BrokerConfig      *BrokerServiceConfig
+	SecurityConfig    *SecurityServiceConfig
 }
 
 func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 	service := &HorizonService{}
-
+	if cfg.SecurityConfig != nil {
+		service.Security = horizon.NewSecurityService(
+			cfg.SecurityConfig.Memory,
+			cfg.SecurityConfig.Iterations,
+			cfg.SecurityConfig.Parallelism,
+			cfg.SecurityConfig.SaltLength,
+			cfg.SecurityConfig.KeyLength,
+			cfg.SecurityConfig.Secret,
+		)
+	}
+	if cfg.EnvironmentConfig != nil {
+		service.Environment = horizon.NewEnvironmentService(
+			cfg.EnvironmentConfig.Path,
+		)
+	}
 	if cfg.SQLConfig != nil {
 		service.Database = horizon.NewGormDatabase(
 			cfg.SQLConfig.DSN,
@@ -58,20 +76,17 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 			cfg.BrokerConfig.Port,
 		)
 	}
-
-	// Scheduler (Cron) is always initialized if needed
 	service.Cron = horizon.NewHorizonSchedule()
-
 	return service
 }
 
 func (h *HorizonService) Run(ctx context.Context) error {
+
 	if h.Cron != nil {
 		if err := h.Cron.Run(ctx); err != nil {
 			return err
 		}
 	}
-
 	if h.Broker != nil {
 		if err := h.Broker.Run(ctx); err != nil {
 			return err

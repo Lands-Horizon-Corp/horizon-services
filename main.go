@@ -9,6 +9,17 @@ import (
 
 func main() {
 	horizon := services.NewHorizonService(services.HorizonServiceConfig{
+		EnvironmentConfig: &services.EnvironmentServiceConfig{
+			Path: "./.env",
+		},
+		SecurityConfig: &services.SecurityServiceConfig{
+			Memory:      65536, // 64MB
+			Iterations:  3,
+			Parallelism: 2,  // 2 threads
+			SaltLength:  16, // 16 bytes
+			KeyLength:   32, // 32 bytes
+			Secret:      []byte("your-secret-key"),
+		},
 		SQLConfig: &services.SQLServiceConfig{
 			DSN:         "",
 			MaxIdleConn: 10,

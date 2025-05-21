@@ -18,7 +18,7 @@ import (
 )
 
 // SecurityUtils provides cryptographic and security-related functions
-type SecurityUtils interface {
+type SecurityService interface {
 	// GenerateUUID creates a new UUIDv4
 	GenerateUUID(ctx context.Context) (string, error)
 
@@ -45,15 +45,15 @@ type HorizonSecurity struct {
 	secret      []byte
 }
 
-// NewSecurityUtils returns a new instance of SecurityUtils
-func NewSecurityUtils(
+// NewSecurityService returns a new instance of SecurityUtils
+func NewSecurityService(
 	memory uint32,
 	iterations uint32,
 	parallelism uint8,
 	saltLength uint32,
 	keyLength uint32,
 	secret []byte,
-) SecurityUtils {
+) SecurityService {
 	return &HorizonSecurity{
 		memory:      memory,
 		iterations:  iterations,
