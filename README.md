@@ -9,6 +9,9 @@ Make sure you have the following installed before proceeding:
 #### Running Tests
 
 To run tests inside Docker using `docker exec`, execute the following command:
+You can also do this on `terminal` if *golang 1.24.2* is installed and NATS is running inside docker
+
+**Test can take 1 to 5 mins**
 
 ```bash
 go test ./services/horizon_test

@@ -13,8 +13,12 @@ func main() {
 			Path: "./.env",
 		},
 	})
-
 	if err := horizon.Run(context.Background()); err != nil {
 		fmt.Println("Error:", err)
 	}
+	defer func() {
+		if err := horizon.Stop(context.Background()); err != nil {
+			fmt.Println("Error stopping service:", err)
+		}
+	}()
 }
