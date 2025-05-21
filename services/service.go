@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/lands-horizon/horizon-server/services/horizon"
+	"github.com/rotisserie/eris"
 )
 
 type HorizonService struct {
@@ -125,6 +126,13 @@ func (h *HorizonService) Run(ctx context.Context) error {
 			return err
 		}
 	}
-
+	if h.OTP != nil {
+		if h.Cache == nil {
+			return eris.New("OTP service requires a cache service")
+		}
+		if h.Security == nil {
+			return eris.New("OTP service requires a security service")
+		}
+	}
 	return nil
 }

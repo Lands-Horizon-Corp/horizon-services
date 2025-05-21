@@ -8,14 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type AlertVars struct {
-	Name    string
-	Code    string
-	Message string
-}
-
 // go test ./services/horizon_test/horizon.sms_test.go
-func injectMockTwilio(h *horizon.HorizonSMS[AlertVars]) {
+func injectMockTwilio(h *horizon.HorizonSMS) {
 	h.Run(context.Background())
 }
 
@@ -25,40 +19,44 @@ func TestSendSMS(t *testing.T) {
 	accountSID := env.GetString("TWILIO_ACCOUNT_SID", "")
 	authToken := env.GetString("TWILIO_AUTH_TOKEN", "")
 	sender := env.GetString("TWILIO_SENDER", "")
-	reciever := env.GetString("TWILIO_TEST_RECIEVER", "")
+	receiver := env.GetString("TWILIO_TEST_RECIEVER", "")
 
-	h := horizon.NewHorizonSMS[AlertVars](accountSID, authToken, sender, 160).(*horizon.HorizonSMS[AlertVars])
+	h := horizon.NewHorizonSMS(accountSID, authToken, sender, 160).(*horizon.HorizonSMS)
 	injectMockTwilio(h)
 
 	tests := []struct {
 		name    string
-		req     horizon.SMSRequest[AlertVars]
+		req     horizon.SMSRequest
 		wantErr bool
 	}{
 		{
 			name: "valid request",
-			req: horizon.SMSRequest[AlertVars]{
-				To:   reciever,
+			req: horizon.SMSRequest{
+				To:   receiver,
 				Body: "Hi {{.Name}}, alert {{.Code}}: {{.Message}}",
-				Vars: AlertVars{Name: "Alice", Code: "A001", Message: "Test alert"},
+				Vars: map[string]string{
+					"Name":    "Alice",
+					"Code":    "A001",
+					"Message": "Test alert",
+				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "invalid recipient number",
-			req: horizon.SMSRequest[AlertVars]{
+			req: horizon.SMSRequest{
 				To:   "invalid-number",
 				Body: "Test",
-				Vars: AlertVars{},
+				Vars: map[string]string{},
 			},
 			wantErr: true,
 		},
 		{
 			name: "body too long",
-			req: horizon.SMSRequest[AlertVars]{
-				To:   reciever,
+			req: horizon.SMSRequest{
+				To:   receiver,
 				Body: string(make([]byte, 200)), // Exceeds 160 chars
-				Vars: AlertVars{},
+				Vars: map[string]string{},
 			},
 			wantErr: true,
 		},

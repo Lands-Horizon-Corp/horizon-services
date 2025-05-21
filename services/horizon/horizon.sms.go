@@ -16,22 +16,22 @@ import (
 )
 
 // SMSRequest represents a templated SMS message with dynamic variables
-type SMSRequest[T any] struct {
-	To   string // Recipient phone number
-	Body string // Message template body
-	Vars T      // Dynamic variables for template interpolation
+type SMSRequest struct {
+	To   string            // Recipient phone number
+	Body string            // Message template body
+	Vars map[string]string // Dynamic variables for template interpolation
 }
 
 // SMSService defines the interface for SMS processing and delivery
-type SMSService[T any] interface {
+type SMSService interface {
 	Run(ctx context.Context) error
 	Stop(ctx context.Context) error
-	Format(ctx context.Context, req SMSRequest[T]) (*SMSRequest[T], error)
-	Send(ctx context.Context, req SMSRequest[T]) error
+	Format(ctx context.Context, req SMSRequest) (*SMSRequest, error)
+	Send(ctx context.Context, req SMSRequest) error
 }
 
 // HorizonSMS is the default implementation of SMSService using Twilio
-type HorizonSMS[T any] struct {
+type HorizonSMS struct {
 	limiterOnce sync.Once
 	limiter     *rate.Limiter
 	twilio      *twilio.RestClient
@@ -43,8 +43,8 @@ type HorizonSMS[T any] struct {
 }
 
 // NewHorizonSMS constructs a new HorizonSMS
-func NewHorizonSMS[T any](accountSID, authToken, sender string, maxCharacters int32) SMSService[T] {
-	return &HorizonSMS[T]{
+func NewHorizonSMS(accountSID, authToken, sender string, maxCharacters int32) SMSService {
+	return &HorizonSMS{
 		accountSID:    accountSID,
 		authToken:     authToken,
 		sender:        sender,
@@ -53,7 +53,7 @@ func NewHorizonSMS[T any](accountSID, authToken, sender string, maxCharacters in
 }
 
 // Run initializes the rate limiter and Twilio client (once)
-func (h *HorizonSMS[T]) Run(ctx context.Context) error {
+func (h *HorizonSMS) Run(ctx context.Context) error {
 	h.limiterOnce.Do(func() {
 		h.limiter = rate.NewLimiter(rate.Limit(10), 5) // 10 rps, burst 5
 	})
@@ -65,13 +65,13 @@ func (h *HorizonSMS[T]) Run(ctx context.Context) error {
 }
 
 // Stop clears the client and limiter
-func (h *HorizonSMS[T]) Stop(ctx context.Context) error {
+func (h *HorizonSMS) Stop(ctx context.Context) error {
 	h.twilio = nil
 	h.limiter = nil
 	return nil
 }
 
-func (h *HorizonSMS[T]) Format(ctx context.Context, req SMSRequest[T]) (*SMSRequest[T], error) {
+func (h *HorizonSMS) Format(ctx context.Context, req SMSRequest) (*SMSRequest, error) {
 	var tmplBody string
 	if err := isValidFilePath(req.Body); err == nil {
 		content, err := os.ReadFile(req.Body)
@@ -96,7 +96,7 @@ func (h *HorizonSMS[T]) Format(ctx context.Context, req SMSRequest[T]) (*SMSRequ
 }
 
 // Send formats, sanitizes, rate-limits, and dispatches the SMS
-func (h *HorizonSMS[T]) Send(ctx context.Context, req SMSRequest[T]) error {
+func (h *HorizonSMS) Send(ctx context.Context, req SMSRequest) error {
 	// Validate phone numbers
 	if !IsValidPhoneNumber(req.To) {
 		return fmt.Errorf("invalid recipient phone number format: %s", req.To)

@@ -12,12 +12,7 @@ import (
 
 // go test -v ./services/horizon_test/horizon.smtp_test.go
 
-type Vars struct {
-	Name string
-}
-
 func TestHorizonSMTP_Run_Stop(t *testing.T) {
-
 	env := horizon.NewEnvironmentService("../../.env")
 
 	host := env.GetString("SMTP_HOST", "")
@@ -26,7 +21,7 @@ func TestHorizonSMTP_Run_Stop(t *testing.T) {
 	password := env.GetString("SMTP_PASSWORD", "")
 	from := env.GetString("SMTP_FROM", "")
 
-	smtp := horizon.NewHorizonSMTP[Vars](host, port, username, password, from)
+	smtp := horizon.NewHorizonSMTP(host, port, username, password, from)
 	ctx := context.Background()
 
 	require.NoError(t, smtp.Run(ctx))
@@ -34,7 +29,6 @@ func TestHorizonSMTP_Run_Stop(t *testing.T) {
 }
 
 func TestHorizonSMTP_Format_WithTemplateString(t *testing.T) {
-
 	env := horizon.NewEnvironmentService("../../.env")
 
 	host := env.GetString("SMTP_HOST", "")
@@ -44,14 +38,14 @@ func TestHorizonSMTP_Format_WithTemplateString(t *testing.T) {
 	from := env.GetString("SMTP_FROM", "")
 	reciever := env.GetString("SMTP_TEST_RECIEVER", "")
 
-	smtp := horizon.NewHorizonSMTP[Vars](host, port, username, password, from)
+	smtp := horizon.NewHorizonSMTP(host, port, username, password, from)
 	ctx := context.Background()
 
-	req := horizon.SMTPRequest[Vars]{
+	req := horizon.SMTPRequest{
 		To:      reciever,
 		Subject: "Test Subject",
 		Body:    "Hello {{.Name}}, welcome!",
-		Vars:    Vars{Name: "Alice"},
+		Vars:    map[string]string{"Name": "Alice"},
 	}
 
 	formatted, err := smtp.Format(ctx, req)
@@ -60,7 +54,6 @@ func TestHorizonSMTP_Format_WithTemplateString(t *testing.T) {
 }
 
 func TestHorizonSMTP_Format_WithTemplateFile(t *testing.T) {
-
 	env := horizon.NewEnvironmentService("../../.env")
 
 	host := env.GetString("SMTP_HOST", "")
@@ -75,14 +68,14 @@ func TestHorizonSMTP_Format_WithTemplateFile(t *testing.T) {
 	os.WriteFile(file, []byte(content), 0644)
 	defer os.Remove(file)
 
-	smtp := horizon.NewHorizonSMTP[Vars](host, port, username, password, from)
+	smtp := horizon.NewHorizonSMTP(host, port, username, password, from)
 	ctx := context.Background()
 
-	req := horizon.SMTPRequest[Vars]{
+	req := horizon.SMTPRequest{
 		To:      reciever,
 		Subject: "Test File",
 		Body:    file,
-		Vars:    Vars{Name: "Bob"},
+		Vars:    map[string]string{"Name": "Bob"},
 	}
 
 	formatted, err := smtp.Format(ctx, req)
@@ -99,21 +92,22 @@ func TestHorizonSMTP_Send_InvalidEmail(t *testing.T) {
 	password := env.GetString("SMTP_PASSWORD", "")
 	from := env.GetString("SMTP_FROM", "")
 
-	smtp := horizon.NewHorizonSMTP[Vars](host, port, username, password, from)
+	smtp := horizon.NewHorizonSMTP(host, port, username, password, from)
 	ctx := context.Background()
 	_ = smtp.Run(ctx)
 
-	req := horizon.SMTPRequest[Vars]{
+	req := horizon.SMTPRequest{
 		To:      "also-invalid",
 		Subject: "Test",
 		Body:    "Hello {{.Name}}",
-		Vars:    Vars{Name: "Test"},
+		Vars:    map[string]string{"Name": "Test"},
 	}
 
 	err := smtp.Send(ctx, req)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "format is invalid")
 }
+
 func TestHorizonSMTP_Send_RateLimitExceeded(t *testing.T) {
 	env := horizon.NewEnvironmentService("../../.env")
 
@@ -127,30 +121,26 @@ func TestHorizonSMTP_Send_RateLimitExceeded(t *testing.T) {
 	require.NotEmpty(t, from, "SMTP_FROM must be set for test")
 	require.NotEmpty(t, reciever, "SMTP_TEST_RECIEVER must be set for test")
 
-	smtp := horizon.NewHorizonSMTP[Vars](host, port, username, password, from)
+	smtp := horizon.NewHorizonSMTP(host, port, username, password, from)
 	ctx := context.Background()
 	require.NoError(t, smtp.Run(ctx))
 
 	// Rapid calls to exhaust limiter
 	for i := 0; i < 3; i++ {
-		_ = smtp.Send(ctx, horizon.SMTPRequest[Vars]{
+		_ = smtp.Send(ctx, horizon.SMTPRequest{
 			To:      reciever,
 			Subject: "Rate Test",
 			Body:    "Hi {{.Name}}",
-			Vars:    Vars{Name: "Test"},
+			Vars:    map[string]string{"Name": "Test"},
 		})
 	}
 
-	err := smtp.Send(ctx, horizon.SMTPRequest[Vars]{
+	err := smtp.Send(ctx, horizon.SMTPRequest{
 		To:      reciever,
 		Subject: "Should Fail",
 		Body:    "Hi {{.Name}}",
-		Vars:    Vars{Name: "Test"},
+		Vars:    map[string]string{"Name": "Test"},
 	})
 
-	// If you want to test rate limiting, you must mock or simulate limiter because
-	// the current limiter will block until token available.
-	// So, here you can check error or just assert err != nil:
 	assert.Error(t, err)
-	// Optionally check error message contains known text
 }

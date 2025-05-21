@@ -14,56 +14,15 @@ import (
 	"golang.org/x/time/rate"
 )
 
-/*
-func main() {
-    // Initialize HorizonSMTP
-    smtpService := NewHorizonSMTP("smtp.example.com", 587, "your_username", "your_password", "your_email@example.com")
-
-    // Run the SMTP service (initialize resources like rate limiter)
-    if err := smtpService.Run(context.Background()); err != nil {
-        fmt.Println("Failed to run SMTP service:", err)
-        return
-    }
-
-    // Example SMTP request
-    emailRequest := SMTPRequest{
-        To:      "recipient@example.com",
-        Subject: "Test Email",
-        Body:    "Hello {{.Name}},\n\nThis is a test email.",
-        Vars: struct {
-            Name string
-        }{
-            Name: "John Doe",
-        },
-    }
-
-    // Format the email body with dynamic variables
-    formattedRequest, err := smtpService.Format(context.Background(), emailRequest)
-    if err != nil {
-        fmt.Println("Failed to format email:", err)
-        return
-    }
-
-    // Send the formatted email
-    if err := smtpService.Send(context.Background(), *formattedRequest); err != nil {
-        fmt.Println("Failed to send email:", err)
-        return
-    }
-
-    fmt.Println("Email sent successfully!")
+// SMTPRequest represents a templated SMTP request with dynamic variables as map[string]string
+type SMTPRequest struct {
+	To      string            // Recipient SMTP address
+	Subject string            // SMTP subject line
+	Body    string            // Template body with placeholders
+	Vars    map[string]string // Dynamic variables for template interpolation
 }
 
-*/
-
-// SMTPRequest represents a templated SMTP request with dynamic variables
-type SMTPRequest[T any] struct {
-	To      string // Recipient SMTP address
-	Subject string // SMTP subject line
-	Body    string // Template body with placeholders
-	Vars    T      // Dynamic variables for template interpolation
-}
-
-type SMTPService[T any] interface {
+type SMTPService interface {
 	// Run initializes internal resources like rate limiter
 	Run(ctx context.Context) error
 
@@ -71,13 +30,13 @@ type SMTPService[T any] interface {
 	Stop(ctx context.Context) error
 
 	// Format processes template and injects variables
-	Format(ctx context.Context, req SMTPRequest[T]) (*SMTPRequest[T], error)
+	Format(ctx context.Context, req SMTPRequest) (*SMTPRequest, error)
 
 	// Send dispatches the formatted SMTP to the recipient
-	Send(ctx context.Context, req SMTPRequest[T]) error
+	Send(ctx context.Context, req SMTPRequest) error
 }
 
-type HorizonSMTP[T any] struct {
+type HorizonSMTP struct {
 	host     string
 	port     int
 	username string
@@ -89,8 +48,8 @@ type HorizonSMTP[T any] struct {
 }
 
 // NewHorizonSMTP constructs a new HorizonSMTP client
-func NewHorizonSMTP[T any](host string, port int, username, password string, from string) SMTPService[T] {
-	return &HorizonSMTP[T]{
+func NewHorizonSMTP(host string, port int, username, password string, from string) SMTPService {
+	return &HorizonSMTP{
 		host:     host,
 		port:     port,
 		username: username,
@@ -100,7 +59,7 @@ func NewHorizonSMTP[T any](host string, port int, username, password string, fro
 }
 
 // Run implements SMTPService.
-func (h *HorizonSMTP[T]) Run(ctx context.Context) error {
+func (h *HorizonSMTP) Run(ctx context.Context) error {
 	h.limiterOnce.Do(func() {
 		h.limiter = rate.NewLimiter(rate.Limit(10), 5) // 10 rps, burst 5
 	})
@@ -108,13 +67,13 @@ func (h *HorizonSMTP[T]) Run(ctx context.Context) error {
 }
 
 // Stop implements SMTPService.
-func (h *HorizonSMTP[T]) Stop(ctx context.Context) error {
+func (h *HorizonSMTP) Stop(ctx context.Context) error {
 	h.limiter = nil
 	return nil
 }
 
 // Format implements SMTPService.
-func (h *HorizonSMTP[T]) Format(ctx context.Context, req SMTPRequest[T]) (*SMTPRequest[T], error) {
+func (h *HorizonSMTP) Format(ctx context.Context, req SMTPRequest) (*SMTPRequest, error) {
 	var tmplBody string
 
 	if err := isValidFilePath(req.Body); err == nil {
@@ -140,7 +99,7 @@ func (h *HorizonSMTP[T]) Format(ctx context.Context, req SMTPRequest[T]) (*SMTPR
 }
 
 // Send implements SMTPService.
-func (h *HorizonSMTP[T]) Send(ctx context.Context, req SMTPRequest[T]) error {
+func (h *HorizonSMTP) Send(ctx context.Context, req SMTPRequest) error {
 	if !IsValidEmail(req.To) {
 		return eris.New("Recipient email format is invalid")
 	}
