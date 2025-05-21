@@ -54,7 +54,6 @@ func NewSecurityUtils(
 	keyLength uint32,
 	secret []byte,
 ) SecurityUtils {
-
 	return &HorizonSecurity{
 		memory:      memory,
 		iterations:  iterations,

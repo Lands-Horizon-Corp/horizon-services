@@ -11,7 +11,9 @@ require (
 	github.com/Backblaze/blazer v0.7.2 // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
@@ -19,6 +21,7 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.26.0 // indirect
+	github.com/go-redis/redis v6.15.9+incompatible // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/mock v1.6.0 // indirect
@@ -66,6 +69,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/minio-go v6.0.14+incompatible
 	github.com/minio/minio-go/v7 v7.0.91
+	github.com/redis/go-redis/v9 v9.8.0
 	github.com/rotisserie/eris v0.5.4
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
