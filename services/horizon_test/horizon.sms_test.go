@@ -14,13 +14,13 @@ type AlertVars struct {
 	Message string
 }
 
-// injectMockTwilio allows test control over the Twilio client
+// go test ./services/horizon_test/horizon.sms_test.go
 func injectMockTwilio(h *horizon.HorizonSMS[AlertVars]) {
 	h.Run(context.Background())
 }
 
 func TestSendSMS(t *testing.T) {
-	env := horizon.NewEnvironmentService("../.env")
+	env := horizon.NewEnvironmentService("../../.env")
 
 	accountSID := env.GetString("TWILIO_ACCOUNT_SID", "")
 	authToken := env.GetString("TWILIO_AUTH_TOKEN", "")
