@@ -1,9 +1,11 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lands-horizon/horizon-server/src"
 	"gorm.io/gorm"
 )
 
@@ -40,4 +42,51 @@ type (
 		FeedbackType string     `json:"feedback_type" validate:"required,oneof=general bug feature"`
 		MediaID      *uuid.UUID `json:"media_id,omitempty"`
 	}
+
+	FeedbackCollection struct {
+		Manager Repository[Feedback, FeedbackResponse, FeedbackRequest]
+	}
 )
+
+func NewFeedbackCollection(provider *src.Provider, media *MediaCollection) (*FeedbackCollection, error) {
+	manager := NewRepository(RepositoryParams[Feedback, FeedbackResponse, FeedbackRequest]{
+		Preloads: nil,
+		Provider: provider,
+		Resource: func(data *Feedback) *FeedbackResponse {
+			if data == nil {
+				return nil
+			}
+			return &FeedbackResponse{
+				ID:           data.ID,
+				CreatedAt:    data.CreatedAt.Format(time.RFC3339),
+				UpdatedAt:    data.UpdatedAt.Format(time.RFC3339),
+				MediaID:      data.MediaID,
+				Media:        media.Manager.ToModel(data.Media),
+				Email:        data.Email,
+				Description:  data.Description,
+				FeedbackType: data.FeedbackType,
+			}
+		},
+		Created: func(data *Feedback) []string {
+			return []string{
+				"feedback.create",
+				fmt.Sprintf("feedback.create.%s", data.ID),
+			}
+		},
+		Updated: func(data *Feedback) []string {
+			return []string{
+				"feedback.update",
+				fmt.Sprintf("feedback.update.%s", data.ID),
+			}
+		},
+		Deleted: func(data *Feedback) []string {
+			return []string{
+				"feedback.delete",
+				fmt.Sprintf("feedback.delete.%s", data.ID),
+			}
+		},
+	})
+	return &FeedbackCollection{
+		Manager: manager,
+	}, nil
+}

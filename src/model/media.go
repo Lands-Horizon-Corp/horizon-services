@@ -1,9 +1,13 @@
 package model
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lands-horizon/horizon-server/services/horizon"
+	"github.com/lands-horizon/horizon-server/src"
 	"gorm.io/gorm"
 )
 
@@ -53,4 +57,66 @@ type (
 		BucketName string     `json:"bucket_name,omitempty" validate:"max=255"`
 		Progress   int64      `json:"status"`
 	}
+
+	MediaCollection struct {
+		Manager Repository[Media, MediaResponse, MediaRequest]
+	}
 )
+
+func NewMediaCollection(provider *src.Provider) (*MediaCollection, error) {
+	manager := NewRepository(RepositoryParams[Media, MediaResponse, MediaRequest]{
+		Preloads: nil,
+		Provider: provider,
+		Resource: func(data *Media) *MediaResponse {
+			if data == nil {
+				return nil
+			}
+			temporaryURL, err := provider.Service.Storage.GeneratePresignedURL(context.Background(), &horizon.Storage{
+				FileName:   data.FileName,
+				FileSize:   data.FileSize,
+				FileType:   data.FileType,
+				StorageKey: data.StorageKey,
+				BucketName: data.BucketName,
+			}, time.Minute*30)
+			if err != nil {
+				temporaryURL = ""
+			}
+			return &MediaResponse{
+				ID:          data.ID,
+				CreatedAt:   data.CreatedAt.Format(time.RFC3339),
+				UpdatedAt:   data.UpdatedAt.Format(time.RFC3339),
+				FileName:    data.FileName,
+				FileSize:    data.FileSize,
+				FileType:    data.FileType,
+				StorageKey:  data.StorageKey,
+				URL:         data.URL,
+				Key:         data.Key,
+				BucketName:  data.BucketName,
+				DownloadURL: temporaryURL,
+				Status:      data.Status,
+				Progress:    data.Progress,
+			}
+		},
+		Created: func(data *Media) []string {
+			return []string{
+				"media.create",
+				fmt.Sprintf("media.create.%s", data.ID),
+			}
+		},
+		Updated: func(data *Media) []string {
+			return []string{
+				"media.update",
+				fmt.Sprintf("media.update.%s", data.ID),
+			}
+		},
+		Deleted: func(data *Media) []string {
+			return []string{
+				"media.delete",
+				fmt.Sprintf("media.delete.%s", data.ID),
+			}
+		},
+	})
+	return &MediaCollection{
+		Manager: manager,
+	}, nil
+}

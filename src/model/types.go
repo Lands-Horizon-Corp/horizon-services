@@ -1,4 +1,4 @@
-package src
+package model
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/lands-horizon/horizon-server/services/horizon"
+	"github.com/lands-horizon/horizon-server/src"
 	"github.com/rotisserie/eris"
 	"gorm.io/gorm"
 )
@@ -129,20 +130,20 @@ type Repository[TData any, TResponse any, TRequest any] interface {
 
 // RepositoryParams groups the constructor parameters for NewRepository
 type RepositoryParams[TData any, TResponse any, TRequest any] struct {
-	Provider *Provider
-	Created  func(*TData) ([]string, any)
-	Updated  func(*TData) ([]string, any)
-	Deleted  func(*TData) ([]string, any)
+	Provider *src.Provider
+	Created  func(*TData) []string
+	Updated  func(*TData) []string
+	Deleted  func(*TData) []string
 	Resource func(*TData) *TResponse
 	Preloads []string
 }
 
 // CollectionManager is a generic implementation of Repository
 type CollectionManager[TData any, TResponse any, TRequest any] struct {
-	provider *Provider
-	created  func(*TData) ([]string, any)
-	updated  func(*TData) ([]string, any)
-	deleted  func(*TData) ([]string, any)
+	provider *src.Provider
+	created  func(*TData) []string
+	updated  func(*TData) []string
+	deleted  func(*TData) []string
 	resource func(*TData) *TResponse
 	preloads []string
 }
@@ -702,21 +703,24 @@ func (c *CollectionManager[TData, TResponse, TRequest]) UpsertWithTx(ctx context
 
 func (c *CollectionManager[TData, TResponse, TRequest]) CreatedBroadcast(ctx context.Context, entity *TData) {
 	go func() {
-		topics, payload := c.created(entity)
+		topics := c.created(entity)
+		payload := c.ToModel(entity)
 		c.provider.Service.Broker.Dispatch(ctx, topics, payload)
 	}()
 }
 
 func (c *CollectionManager[TData, TResponse, TRequest]) DeletedBroadcast(ctx context.Context, entity *TData) {
 	go func() {
-		topics, payload := c.updated(entity)
+		topics := c.updated(entity)
+		payload := c.ToModel(entity)
 		c.provider.Service.Broker.Dispatch(ctx, topics, payload)
 	}()
 }
 
 func (c *CollectionManager[TData, TResponse, TRequest]) UpdatedBroadcast(ctx context.Context, entity *TData) {
 	go func() {
-		topics, payload := c.updated(entity)
+		topics := c.updated(entity)
+		payload := c.ToModel(entity)
 		c.provider.Service.Broker.Dispatch(ctx, topics, payload)
 	}()
 }
