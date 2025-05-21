@@ -4,8 +4,10 @@ import (
 	"crypto/rand"
 	"errors"
 	"net/mail"
+	"net/url"
 	"os"
 	"regexp"
+	"strings"
 )
 
 func isValidFilePath(p string) error {
@@ -53,4 +55,25 @@ func Create32ByteKey(key []byte) string {
 	padded := make([]byte, 32)
 	copy(padded, key)
 	return string(padded)
+}
+
+func IsValidURL(rawURL string) bool {
+	if rawURL == "" {
+		return false
+	}
+	u, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	if u.Host == "" {
+		return false
+	}
+	if strings.ContainsAny(rawURL, " <>\"") {
+		return false
+	}
+
+	return true
 }

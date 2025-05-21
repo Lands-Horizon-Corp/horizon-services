@@ -3,6 +3,7 @@ package horizon
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -12,82 +13,86 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/Backblaze/blazer/b2"
 	"github.com/rotisserie/eris"
 )
 
-/*
-
-   storageSvc := NewHorizonStorageService(
-        storageHost,
-        accessKey,
-        secretKey,
-        driver,
-        region,
-        bucket,
-        port,
-        maxSize,
-    )
-
-    // Initialize connection and bucket
-    if err := storageSvc.Run(ctx); err != nil {
-        panic(err)
-    }
-
-    // Upload from path
-    storage1, err := storageSvc.Upload(ctx, "/path/to/file.jpg", nil)
-    if err != nil {
-        fmt.Println("Path upload error:", err)
-    } else {
-        fmt.Printf("Uploaded via path: %+v", storage1)
-	}
-
-*/
-
-// Storage represents metadata for uploaded files
-type Storage struct {
-	FileName   string // Original file name
-	FileSize   int64  // File size in bytes
-	FileType   string // MIME type
-	StorageKey string // Unique Storage identifier
-	URL        string // Public access URL
-	BucketName string // Storage bucket name
-	Status     string // Upload status: pending, cancelled, corrupt, completed, progress
-	Progress   int64  // Upload progress percentage
+type StorageService interface {
+	Run(ctx context.Context) error
+	Upload(ctx context.Context, file any, opts ProgressCallback) (*Storage, error)
+	UploadFromBinary(ctx context.Context, data []byte, opts ProgressCallback) (*Storage, error)
+	UploadFromHeader(ctx context.Context, hdr *multipart.FileHeader, opts ProgressCallback) (*Storage, error)
+	UploadFromPath(ctx context.Context, path string, opts ProgressCallback) (*Storage, error)
+	GeneratePresignedURL(ctx context.Context, storage *Storage, expiry time.Duration) (string, error)
+	DeleteFile(ctx context.Context, storage *Storage) error
+	GenerateUniqueName(ctx context.Context, originalName string) (string, error)
 }
 
-// ProgressCallback defines a function type for upload progress updates
-type ProgressCallback func(progress int64, total int64, Storage *Storage)
+type Storage struct {
+	FileName   string
+	FileSize   int64
+	FileType   string
+	StorageKey string
+	URL        string
+	BucketName string
+	Status     string
+	Progress   int64
+}
 
-// StorageService defines the interface for cloud Storage operations
-type StorageService interface {
-	// Run initializes connections to Storage providers
-	Run(ctx context.Context) error
+type ProgressCallback func(progress int64, total int64, storage *Storage)
 
-	// Upload implements StorageService and delegates based on input type:
-	// - string: local file path
-	// - []byte: binary data
-	// - *multipart.FileHeader: HTTP uploaded file
-	Upload(ctx context.Context, file any, opts ProgressCallback) (*Storage, error)
+type HorizonStorage struct {
+	storageAccessKey string
+	storageSecretKey string
+	storageBucket    string
+	prefix           string
+	maxFileSize      int64
+	b2Client         *b2.Client
+	bucket           *b2.Bucket
+}
 
-	// UploadFromBinary uploads raw byte data
-	UploadFromBinary(ctx context.Context, data []byte, opts ProgressCallback) (*Storage, error)
+func NewHorizonStorageService(
+	accessKey,
+	secretKey,
+	prefix,
+	bucket string,
+	maxSize int64,
+) StorageService {
+	return &HorizonStorage{
+		storageAccessKey: accessKey,
+		storageSecretKey: secretKey,
+		prefix:           prefix,
+		storageBucket:    bucket,
+		maxFileSize:      maxSize,
+	}
+}
 
-	// UploadFromHeader handles multipart form file uploads
-	UploadFromHeader(ctx context.Context, hdr *multipart.FileHeader, opts ProgressCallback) (*Storage, error)
+func (h *HorizonStorage) Run(ctx context.Context) error {
+	client, err := b2.NewClient(
+		ctx,
+		h.storageAccessKey,
+		h.storageSecretKey,
+	)
+	if err != nil {
+		return eris.Wrap(err, "B2 authentication failed")
+	}
+	h.b2Client = client
 
-	// UploadFromPath uploads a local file by path
-	UploadFromPath(ctx context.Context, path string, opts ProgressCallback) (*Storage, error)
+	// Try to get existing bucket first
+	if bucket, err := client.Bucket(ctx, h.storageBucket); err == nil {
+		h.bucket = bucket
+		return nil
+	}
 
-	// GeneratePresignedURL creates a time-limited access URL for a stored file
-	GeneratePresignedURL(ctx context.Context, Storage *Storage, expiry time.Duration) (string, error)
-
-	// DeleteFile permanently removes a file from Storage
-	DeleteFile(ctx context.Context, Storage *Storage) error
-
-	// GenerateUniqueName creates a collision-resistant filename
-	GenerateUniqueName(ctx context.Context, originalName string) (string, error)
+	// Create new bucket if it doesn't exist
+	bucket, err := client.NewBucket(ctx, h.storageBucket, &b2.BucketAttrs{
+		Type: b2.Private,
+	})
+	if err != nil {
+		return eris.Wrapf(err, "failed to create bucket %s", h.storageBucket)
+	}
+	h.bucket = bucket
+	return nil
 }
 
 type progressReader struct {
@@ -95,7 +100,7 @@ type progressReader struct {
 	callback  ProgressCallback
 	total     int64
 	readSoFar int64
-	Storage   *Storage
+	storage   *Storage
 }
 
 func (pr *progressReader) Read(p []byte) (int, error) {
@@ -106,336 +111,213 @@ func (pr *progressReader) Read(p []byte) (int, error) {
 		if percent > 100 {
 			percent = 100
 		}
-		pr.Storage.Progress = percent
+		pr.storage.Progress = percent
 		if pr.callback != nil {
-			pr.callback(percent, 100, pr.Storage)
+			pr.callback(percent, 100, pr.storage)
 		}
 	}
 	return n, err
 }
 
-type HorizonStorage struct {
-	storageHost       string
-	storageAccessKey  string
-	storageSecreetKey string
-	storageDriver     string
-	storageRegion     string
-	storageBucket     string
-	storageAPIPort    int16
-	maxFileSize       int64
-	Storage           *minio.Client
-}
-
-func NewHorizonStorageService(
-	storageHost,
-	storageAccessKey,
-	storageSecreetKey,
-	storageDriver,
-	storageRegion,
-	storageBucket string,
-	storageAPIPort int16,
-	maxFileSize int64,
-) StorageService {
-	return &HorizonStorage{
-		storageHost: storageHost,
-
-		storageAccessKey:  storageAccessKey,
-		storageSecreetKey: storageSecreetKey,
-		storageDriver:     storageDriver,
-		storageRegion:     storageRegion,
-		storageBucket:     storageBucket,
-		storageAPIPort:    storageAPIPort,
-		maxFileSize:       maxFileSize,
-		Storage:           nil,
-	}
-}
-
-// Run implements StorageService.
-func (h HorizonStorage) Run(ctx context.Context) error {
-	client, err := minio.New(fmt.Sprintf("%s:%d", h.storageHost, h.storageAPIPort), &minio.Options{
-		Creds:  credentials.NewStaticV4(h.storageAccessKey, h.storageSecreetKey, ""),
-		Secure: false,
-		Region: h.storageRegion,
-		BucketLookup: func() minio.BucketLookupType {
-			if h.storageHost == "s3" {
-				return minio.BucketLookupDNS
-			}
-			return minio.BucketLookupPath
-		}(),
-	})
-	if err != nil {
-		return eris.Wrap(err, "failed to initialize MinIO client")
-	}
-
-	h.Storage = client
-	exists, err := client.BucketExists(ctx, h.storageBucket)
-	if err != nil {
-		return eris.Wrap(err, "failed to check bucket exists")
-	}
-	if !exists {
-		err = client.MakeBucket(ctx, h.storageBucket, minio.MakeBucketOptions{Region: h.storageRegion})
-		if err != nil {
-			return eris.Wrapf(err, "failed to create bucket %s", h.storageBucket)
-		}
-	}
-	return nil
-}
-
-// DeleteFile implements StorageService.
-func (h HorizonStorage) DeleteFile(ctx context.Context, Storage *Storage) error {
-	if h.Storage == nil {
-		return eris.New("not initialized")
-	}
-	if strings.TrimSpace(Storage.StorageKey) == "" {
-		return eris.New("empty key")
-	}
-	err := h.Storage.RemoveObject(ctx, Storage.BucketName, Storage.StorageKey, minio.RemoveObjectOptions{})
-	if err != nil {
-		return eris.Wrapf(err, "delete %s failed", Storage.FileName)
-	}
-	return nil
-}
-
-// GeneratePresignedURL implements StorageService.
-func (h HorizonStorage) GeneratePresignedURL(ctx context.Context, Storage *Storage, expiry time.Duration) (string, error) {
-	if h.Storage == nil {
-		return "", eris.New("not initialized")
-	}
-	if Storage.StorageKey == "" {
-		return "", eris.New("Storage key do not exists")
-	}
-	u, err := h.Storage.PresignedGetObject(ctx, Storage.BucketName, Storage.StorageKey, 24*time.Hour, nil)
-	if err != nil {
-		return "", eris.Wrap(err, "presign failed")
-	}
-	return u.String(), nil
-}
-
-// GenerateUniqueName implements StorageService.
-func (h HorizonStorage) GenerateUniqueName(ctx context.Context, name string) (string, error) {
-	if h.Storage == nil {
-		return "", eris.New("not initialized")
-	}
-	if name == "" {
-		return "", eris.New("Please include name")
-	}
-	return fmt.Sprintf("%s-%d-%s", time.Now().Format("20060102150405"), os.Getpid(), name), nil
-}
-
-func (h *HorizonStorage) Upload(
-	ctx context.Context,
-	input any,
-	callback ProgressCallback,
-) (*Storage, error) {
-	switch v := input.(type) {
+func (h *HorizonStorage) Upload(ctx context.Context, file any, cb ProgressCallback) (*Storage, error) {
+	switch v := file.(type) {
 	case string:
-		return h.UploadFromPath(ctx, v, callback)
+		return h.UploadFromPath(ctx, v, cb)
 	case []byte:
-		return h.UploadFromBinary(ctx, v, callback)
+		return h.UploadFromBinary(ctx, v, cb)
 	case *multipart.FileHeader:
-		return h.UploadFromHeader(ctx, v, callback)
+		return h.UploadFromHeader(ctx, v, cb)
 	default:
-		return nil, eris.Errorf("unsupported upload type %T", input)
+		return nil, eris.Errorf("unsupported type: %T", file)
 	}
 }
 
-// UploadFromBinary implements StorageService.
-func (h HorizonStorage) UploadFromBinary(ctx context.Context, data []byte, callback ProgressCallback) (*Storage, error) {
-	if h.Storage == nil {
-		return nil, eris.New("Storage not initialized")
+func (h *HorizonStorage) UploadFromPath(ctx context.Context, path string, cb ProgressCallback) (*Storage, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, eris.Wrapf(err, "failed to open %s", path)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, eris.Wrapf(err, "failed to stat %s", path)
 	}
 
-	// Prepare reader and size
-	reader := bytes.NewReader(data)
-	size := int64(len(data))
-
-	// Predict content type
 	buf := make([]byte, 512)
-	n, _ := reader.Read(buf)
-	contentType := http.DetectContentType(buf[:n])
-	reader.Seek(0, io.SeekStart)
+	_, err = file.Read(buf)
+	if err != nil && err != io.EOF {
+		return nil, eris.Wrap(err, "content type detection failed")
+	}
+	contentType := http.DetectContentType(buf)
+	file.Seek(0, 0)
 
+	fileName, err := h.GenerateUniqueName(ctx, filepath.Base(path))
+	if err != nil {
+		return nil, err
+	}
+
+	storage := &Storage{
+		FileName:   fileName,
+		FileSize:   info.Size(),
+		FileType:   contentType,
+		StorageKey: fileName,
+		BucketName: h.storageBucket,
+		Status:     "progress",
+	}
+
+	pr := &progressReader{
+		reader:   file,
+		callback: cb,
+		total:    info.Size(),
+		storage:  storage,
+	}
+
+	obj := h.bucket.Object(fileName)
+	w := obj.NewWriter(ctx)
+
+	if _, err := io.Copy(w, pr); err != nil {
+		return nil, eris.Wrap(err, "upload failed")
+	}
+	if err := w.Close(); err != nil {
+		return nil, eris.Wrap(err, "upload finalization failed")
+	}
+
+	url, err := h.GeneratePresignedURL(ctx, storage, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+
+	storage.URL = url
+	storage.Status = "completed"
+	return storage, nil
+}
+
+func (h *HorizonStorage) UploadFromBinary(ctx context.Context, data []byte, cb ProgressCallback) (*Storage, error) {
+	contentType := http.DetectContentType(data)
 	fileName, err := h.GenerateUniqueName(ctx, "file")
 	if err != nil {
 		return nil, err
 	}
-	Storage := &Storage{
-		FileName: fileName,
-		FileSize: size,
-		FileType: contentType,
-		Status:   "progress",
+
+	storage := &Storage{
+		FileName:   fileName,
+		FileSize:   int64(len(data)),
+		FileType:   contentType,
+		StorageKey: fileName,
+		BucketName: h.storageBucket,
+		Status:     "progress",
 	}
 
 	pr := &progressReader{
-		reader:   reader,
-		callback: callback,
-		total:    size,
-		Storage:  Storage,
+		reader:   bytes.NewReader(data),
+		callback: cb,
+		total:    int64(len(data)),
+		storage:  storage,
 	}
 
-	uploadInfo, err := h.Storage.PutObject(
-		ctx,
-		h.storageBucket,
-		fileName,
-		pr,
-		size,
-		minio.PutObjectOptions{ContentType: contentType},
-	)
+	obj := h.bucket.Object(fileName)
+	w := obj.NewWriter(ctx)
+
+	if _, err := io.Copy(w, pr); err != nil {
+		return nil, eris.Wrap(err, "upload failed")
+	}
+	if err := w.Close(); err != nil {
+		return nil, eris.Wrap(err, "upload finalization failed")
+	}
+
+	url, err := h.GeneratePresignedURL(ctx, storage, 24*time.Hour)
 	if err != nil {
-		return nil, eris.Wrap(err, "failed to upload binary data")
+		return nil, err
 	}
 
-	// Update record
-	Storage.StorageKey = uploadInfo.Key
-	Storage.BucketName = h.storageBucket
-
-	// Generate URL
-	url, err := h.GeneratePresignedURL(ctx, Storage, 5*time.Minute)
-	if err != nil {
-		return nil, eris.Wrap(err, "failed to generate presigned URL")
-	}
-
-	Storage.URL = url
-	Storage.Status = "completed"
-	Storage.Progress = uploadInfo.Size
-
-	return Storage, nil
-
+	storage.URL = url
+	storage.Status = "completed"
+	return storage, nil
 }
 
-// UploadFromHeader implements StorageService.
-func (h HorizonStorage) UploadFromHeader(ctx context.Context, file *multipart.FileHeader, callback ProgressCallback) (*Storage, error) {
-	// Ensure Storage client is initialized
-	if h.Storage == nil {
-		return nil, eris.New("Storage not initialized")
-	}
-	src, err := file.Open()
+func (h *HorizonStorage) UploadFromHeader(ctx context.Context, header *multipart.FileHeader, cb ProgressCallback) (*Storage, error) {
+	file, err := header.Open()
 	if err != nil {
-		return nil, eris.Wrapf(err, "open %s failed", file.Filename)
+		return nil, eris.Wrap(err, "failed to open multipart file")
 	}
-	defer src.Close()
-	contentType := file.Header.Get("Content-Type")
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 
-	// Generate unique file name
-	fileName, err := h.GenerateUniqueName(ctx, file.Filename)
+	fileName, err := h.GenerateUniqueName(ctx, header.Filename)
 	if err != nil {
-		return nil, eris.Wrap(err, "failed to generate unique name")
-	}
-	Storage := &Storage{
-		FileName: fileName,
-		FileSize: file.Size,
-		FileType: contentType,
-		Status:   "progress",
-	}
-
-	pr := &progressReader{reader: src, callback: callback, total: file.Size, Storage: Storage}
-	info, err := h.Storage.PutObject(ctx, h.storageBucket, fileName, pr, file.Size, minio.PutObjectOptions{ContentType: contentType})
-	if err != nil {
-		return nil, eris.Wrapf(err, "upload %s failed", file.Filename)
-	}
-
-	// Update Storage record
-	Storage.StorageKey = info.Key
-	Storage.BucketName = h.storageBucket
-
-	// Generate presigned URL
-	url, err := h.GeneratePresignedURL(ctx, Storage, 5*time.Minute)
-	if err != nil {
-		return nil, eris.Wrap(err, "failed to generate presigned URL")
-	}
-
-	Storage.URL = url
-	Storage.Status = "completed"
-	Storage.Progress = info.Size
-	return Storage, nil
-}
-
-// UploadFromPath implements StorageService.
-func (h *HorizonStorage) UploadFromPath(ctx context.Context, path string, callback ProgressCallback,
-) (*Storage, error) {
-	// Ensure Storage client is initialized
-	if h.Storage == nil {
-		return nil, eris.New("Storage not initialized")
-	}
-
-	// Validate and clean path
-	cleanPath := strings.TrimSpace(path)
-	if err := isValidFilePath(cleanPath); err != nil {
 		return nil, err
 	}
 
-	// Open file
-	file, err := os.Open(cleanPath)
-	if err != nil {
-		return nil, eris.Wrapf(err, "failed to open file: %s", cleanPath)
-	}
-	defer file.Close()
-
-	// Get file info
-	info, err := file.Stat()
-	if err != nil {
-		return nil, eris.Wrapf(err, "failed to stat file: %s", cleanPath)
+	storage := &Storage{
+		FileName:   fileName,
+		FileSize:   header.Size,
+		FileType:   contentType,
+		StorageKey: fileName,
+		BucketName: h.storageBucket,
+		Status:     "progress",
 	}
 
-	// Detect content type
-	buf := make([]byte, 512)
-	n, _ := file.Read(buf)
-	contentType := http.DetectContentType(buf[:n])
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return nil, eris.Wrap(err, "failed to reset file reader")
-	}
-
-	// Generate unique file name
-	fileName, err := h.GenerateUniqueName(ctx, filepath.Base(cleanPath))
-	if err != nil {
-		return nil, eris.Wrap(err, "failed to generate unique name")
-	}
-
-	// Prepare Storage record
-	Storage := &Storage{
-		FileName: fileName,
-		FileSize: info.Size(),
-		FileType: contentType,
-		Status:   "progress",
-	}
-
-	// Wrap reader for progress tracking
-	reader := &progressReader{
+	pr := &progressReader{
 		reader:   file,
-		callback: callback,
-		total:    info.Size(),
-		Storage:  Storage,
+		callback: cb,
+		total:    header.Size,
+		storage:  storage,
 	}
 
-	// Upload to MinIO
-	uploadInfo, err := h.Storage.PutObject(
-		ctx,
+	obj := h.bucket.Object(fileName)
+	w := obj.NewWriter(ctx)
+
+	if _, err := io.Copy(w, pr); err != nil {
+		return nil, eris.Wrap(err, "upload failed")
+	}
+	if err := w.Close(); err != nil {
+		return nil, eris.Wrap(err, "upload finalization failed")
+	}
+
+	url, err := h.GeneratePresignedURL(ctx, storage, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+
+	storage.URL = url
+	storage.Status = "completed"
+	return storage, nil
+}
+
+func (h *HorizonStorage) GeneratePresignedURL(ctx context.Context, storage *Storage, expiry time.Duration) (string, error) {
+	obj := h.bucket.Object(storage.StorageKey)
+	_, err := obj.Attrs(ctx)
+	if err != nil {
+		return "", eris.Wrap(errors.New("failed to presign URL"), "file does not exist")
+	}
+	authToken, err := h.bucket.AuthToken(ctx, h.prefix, expiry)
+	if err != nil {
+		return "", eris.Wrap(errors.New("failed to generate authorization token"), err.Error())
+	}
+
+	downloadURL := fmt.Sprintf("%s/file/%s/%s?Authorization=%s",
+		h.bucket.BaseURL(),
 		h.storageBucket,
-		fileName,
-		reader,
-		info.Size(),
-		minio.PutObjectOptions{ContentType: contentType},
+		storage.StorageKey,
+		authToken,
 	)
-	if err != nil {
-		return nil, eris.Wrap(err, "failed to upload file")
+	return downloadURL, nil
+}
+func (h *HorizonStorage) DeleteFile(ctx context.Context, storage *Storage) error {
+	obj := h.bucket.Object(storage.StorageKey)
+	if err := obj.Delete(ctx); err != nil {
+		return eris.Wrap(err, "file deletion failed")
 	}
+	return nil
+}
 
-	// Update Storage record
-	Storage.StorageKey = uploadInfo.Key
-	Storage.BucketName = h.storageBucket
-
-	// Generate presigned URL
-	url, err := h.GeneratePresignedURL(ctx, Storage, 5*time.Minute)
-	if err != nil {
-		return nil, eris.Wrap(err, "failed to generate presigned URL")
-	}
-
-	Storage.URL = url
-	Storage.Status = "completed"
-	Storage.Progress = uploadInfo.Size
-
-	return Storage, nil
+func (h *HorizonStorage) GenerateUniqueName(ctx context.Context, original string) (string, error) {
+	ext := filepath.Ext(original)
+	base := strings.TrimSuffix(original, ext)
+	return fmt.Sprintf("%s%d-%s%s", h.prefix, time.Now().UnixNano(), base, ext), nil
 }

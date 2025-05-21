@@ -1,7 +1,7 @@
 
 - Running Test inside Docker exec
 ```bash
-go test ./horizon_test
+go test ./services/horizon_test
 ```
 
 - Restart Docker
