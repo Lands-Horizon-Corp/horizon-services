@@ -9,8 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// go test ./services/horizon_test/horizon.security_test.go
 func setupSecurityUtils() horizon.SecurityUtils {
-	env := horizon.NewEnvironmentService("../.env")
+	env := horizon.NewEnvironmentService("../../.env")
 	token := env.GetByteSlice("APP_TOKEN", "")
 	return horizon.NewSecurityUtils(
 		env.GetUint32("PASSWORD_MEMORY", 65536),  // memory (e.g., 64MB)
