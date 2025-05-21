@@ -102,7 +102,7 @@ func NewHorizonSMTP[T any](host string, port int, username, password string, fro
 // Run implements SMTPService.
 func (h *HorizonSMTP[T]) Run(ctx context.Context) error {
 	h.limiterOnce.Do(func() {
-		h.limiter = rate.NewLimiter(rate.Limit(1), 3)
+		h.limiter = rate.NewLimiter(rate.Limit(10), 5) // 10 rps, burst 5
 	})
 	return nil
 }
@@ -141,42 +141,30 @@ func (h *HorizonSMTP[T]) Format(ctx context.Context, req SMTPRequest[T]) (*SMTPR
 
 // Send implements SMTPService.
 func (h *HorizonSMTP[T]) Send(ctx context.Context, req SMTPRequest[T]) error {
-	// Validate the recipient email address format
 	if !IsValidEmail(req.To) {
 		return eris.New("Recipient email format is invalid")
 	}
-	// Validate the configured sender email address format
-
 	if !IsValidEmail(h.from) {
-		return eris.New("Admn email format is invalid")
+		return eris.New("Admin email format is invalid")
 	}
-	// Apply rate limiting to control send rate
+
+	// Wait for rate limiter token (blocking)
 	if err := h.limiter.Wait(ctx); err != nil {
 		return eris.Wrap(err, "rate limit wait failed")
 	}
 
-	// Check if rate limiter exceed
-	if !h.limiter.Allow() {
-		err := fmt.Errorf("rate limit exceeded for sending SMS")
-		return err
-	}
-
-	// Sanitize the raw body template for safety
+	// Sanitize and format body
 	req.Body = bluemonday.UGCPolicy().Sanitize(req.Body)
-
-	// Inject dynamic variables into the sanitized body
 	finalBody, err := h.Format(ctx, req)
 	if err != nil {
 		return eris.Wrap(err, "failed to inject variables into body")
 	}
 	req.Body = finalBody.Body
 
-	// Build SMTP authentication and message
 	auth := smtp.PlainAuth("", h.username, h.password, h.host)
 	addr := fmt.Sprintf("%s:%d", h.host, h.port)
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s", h.from, req.To, req.Subject, req.Body)
 
-	// Send the email via SMTP
 	if err := smtp.SendMail(addr, auth, h.from, []string{req.To}, []byte(msg)); err != nil {
 		return eris.Wrap(err, "smtp send failed")
 	}
