@@ -1,24 +1,23 @@
 package main
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/lands-horizon/horizon-server/services"
+	"github.com/lands-horizon/horizon-server/src"
+	"github.com/lands-horizon/horizon-server/src/cooperative_tokens"
+	"go.uber.org/fx"
 )
 
 func main() {
-	horizon := services.NewHorizonService(services.HorizonServiceConfig{
-		EnvironmentConfig: &services.EnvironmentServiceConfig{
-			Path: "./.env",
-		},
-	})
-	if err := horizon.Run(context.Background()); err != nil {
-		fmt.Println("Error:", err)
-	}
-	defer func() {
-		if err := horizon.Stop(context.Background()); err != nil {
-			fmt.Println("Error stopping service:", err)
-		}
-	}()
+	app := fx.New(
+		fx.Provide(
+			src.NewProvider,
+			cooperative_tokens.NewUserToken,
+			cooperative_tokens.NewTransactionBatchToken,
+			cooperative_tokens.NewUserOrganizatonToken,
+		),
+		fx.Invoke(
+			src.NewProvider,
+		),
+	)
+	app.Run()
+
 }
