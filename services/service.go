@@ -19,6 +19,7 @@ type HorizonService struct {
 	SMS         horizon.SMSService
 	SMTP        horizon.SMTPService
 	Request     horizon.APIService
+	QR          horizon.QRService
 }
 
 type HorizonServiceConfig struct {
@@ -191,6 +192,7 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 	}
 
 	service.Cron = horizon.NewHorizonSchedule()
+	service.QR = horizon.NewHorizonQRService(service.Security)
 	return service
 }
 
