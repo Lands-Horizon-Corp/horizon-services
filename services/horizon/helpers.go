@@ -3,12 +3,18 @@ package horizon
 import (
 	"errors"
 	"math/rand"
+	"net/http"
 	"net/mail"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
 )
 
 func isValidFilePath(p string) error {
@@ -101,4 +107,50 @@ func intPow(a, b int) int {
 		result *= a
 	}
 	return result
+}
+
+func Capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	r, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[size:]
+}
+
+func MergeString(defaults, overrides []string) []string {
+	totalCap := len(defaults) + len(overrides)
+	seen := make(map[string]struct{}, totalCap)
+	out := make([]string, 0, totalCap)
+	for _, slice := range [][]string{defaults, overrides} {
+		for _, p := range slice {
+			cp := Capitalize(p)
+			if cp == "" {
+				continue
+			}
+			if _, exists := seen[cp]; !exists {
+				seen[cp] = struct{}{}
+				out = append(out, cp)
+			}
+		}
+	}
+	return out
+}
+
+func EngineUUIDParam(ctx echo.Context, idParam string) (*uuid.UUID, error) {
+	param := ctx.Param(idParam)
+	id, err := uuid.Parse(param)
+	if err != nil {
+		return nil, ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid feedback ID"})
+	}
+	return &id, nil
+}
+
+func ParseUUID(s *string) uuid.UUID {
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return uuid.Nil
+	}
+	if id, err := uuid.Parse(*s); err == nil {
+		return id
+	}
+	return uuid.Nil
 }

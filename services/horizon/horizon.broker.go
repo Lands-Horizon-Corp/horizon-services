@@ -21,7 +21,7 @@ type MessageBrokerService interface {
 	Publish(ctx context.Context, topic string, payload any) error
 
 	// DispatchBatch sends a message to multiple topics
-	DispatchBatch(ctx context.Context, topics []string, payload any) error
+	Dispatch(ctx context.Context, topics []string, payload any) error
 
 	// Subscribe registers a message handler for a topic
 	Subscribe(ctx context.Context, topic string, handler func(any) error) error
@@ -61,7 +61,7 @@ func (h *HorizonMessageBroker) Stop(ctx context.Context) error {
 }
 
 // DispatchBatch implements MessageBroker.
-func (h *HorizonMessageBroker) DispatchBatch(ctx context.Context, topics []string, payload any) error {
+func (h *HorizonMessageBroker) Dispatch(ctx context.Context, topics []string, payload any) error {
 	if h.nc == nil {
 		return eris.New("NATS connection not initialized")
 	}
