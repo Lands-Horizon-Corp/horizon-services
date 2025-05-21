@@ -2,6 +2,7 @@ package src
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -177,6 +178,18 @@ func (c *CollectionManager[TData, TResponse, TRequest]) ToModels(data []*TData) 
 	return out
 }
 
+// Validate implements Repository.
+func (c *CollectionManager[TData, TResponse, TRequest]) Validate(ctx echo.Context, v *validator.Validate) (*TRequest, error) {
+	var req TRequest
+	if err := ctx.Bind(&req); err != nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := v.Struct(req); err != nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return &req, nil
+}
+
 // Count implements Repository.
 func (c *CollectionManager[TData, TResponse, TRequest]) Count(ctx context.Context, fields *TData) (int64, error) {
 	panic("unimplemented")
@@ -334,10 +347,5 @@ func (c *CollectionManager[TData, TResponse, TRequest]) UpsertManyWithTx(ctx con
 
 // UpsertWithTx implements Repository.
 func (c *CollectionManager[TData, TResponse, TRequest]) UpsertWithTx(ctx context.Context, tx *gorm.DB, entity *TData, preloads ...string) error {
-	panic("unimplemented")
-}
-
-// Validate implements Repository.
-func (c *CollectionManager[TData, TResponse, TRequest]) Validate(ctx echo.Context, v *validator.Validate) (*TRequest, error) {
 	panic("unimplemented")
 }
