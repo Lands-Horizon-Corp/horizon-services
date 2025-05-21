@@ -43,6 +43,9 @@ func main() {
 			Host: "",
 			Port: 4222,
 		},
+		OTPServiceConfig: &services.OTPServiceConfig{
+			Secret: []byte("your-otp-secret"),
+		},
 	})
 
 	if err := horizon.Run(context.Background()); err != nil {

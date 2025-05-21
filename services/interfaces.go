@@ -43,3 +43,7 @@ type SecurityServiceConfig struct {
 	KeyLength   uint32 `env:"PASSWORD_KEY_LENGTH"`
 	Secret      []byte `env:"PASSWORD_SECRET"`
 }
+
+type OTPServiceConfig struct {
+	Secret []byte `env:"OTP_SECRET"`
+}

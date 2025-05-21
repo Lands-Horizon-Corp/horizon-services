@@ -14,6 +14,7 @@ type HorizonService struct {
 	Broker      horizon.MessageBrokerService
 	Cron        horizon.SchedulerService
 	Security    horizon.SecurityService
+	OTP         horizon.OTPService
 }
 
 type HorizonServiceConfig struct {
@@ -23,6 +24,7 @@ type HorizonServiceConfig struct {
 	CacheConfig       *CacheServiceConfig
 	BrokerConfig      *BrokerServiceConfig
 	SecurityConfig    *SecurityServiceConfig
+	OTPServiceConfig  *OTPServiceConfig
 }
 
 func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
@@ -74,6 +76,13 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 		service.Broker = horizon.NewHorizonMessageBroker(
 			cfg.BrokerConfig.Host,
 			cfg.BrokerConfig.Port,
+		)
+	}
+	if cfg.OTPServiceConfig != nil {
+		service.OTP = horizon.NewHorizonOTP(
+			cfg.OTPServiceConfig.Secret,
+			service.Cache,
+			service.Security,
 		)
 	}
 	service.Cron = horizon.NewHorizonSchedule()
