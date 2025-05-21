@@ -25,3 +25,8 @@ type CacheServiceConfig struct {
 	Username string
 	Port     int
 }
+
+type BrokerServiceConfig struct {
+	Host string
+	Port int
+}

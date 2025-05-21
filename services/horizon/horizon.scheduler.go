@@ -9,9 +9,9 @@ import (
 )
 
 // Scheduler defines the interface for scheduling and managing cron jobs
-type Scheduler interface {
+type SchedulerService interface {
 	// Start initializes the scheduler and in-memory job store
-	Start(ctx context.Context) error
+	Run(ctx context.Context) error
 
 	// Stop gracefully shuts down the scheduler and clears all timers
 	Stop(ctx context.Context) error
@@ -41,7 +41,7 @@ type HorizonSchedule struct {
 	mutex sync.Mutex
 }
 
-func NewHorizonSchedule() Scheduler {
+func NewHorizonSchedule() SchedulerService {
 	return &HorizonSchedule{
 		cron: cron.New(),
 		jobs: make(map[string]job),
@@ -102,7 +102,7 @@ func (h *HorizonSchedule) ExecuteJob(ctx context.Context, jobID string) error {
 }
 
 // Start implements Scheduler.
-func (h *HorizonSchedule) Start(ctx context.Context) error {
+func (h *HorizonSchedule) Run(ctx context.Context) error {
 	h.cron.Start()
 	return nil
 }

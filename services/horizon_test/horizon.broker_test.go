@@ -19,7 +19,7 @@ func TestHorizonMessageBroker_PublishSubscribe(t *testing.T) {
 	ctx := context.Background()
 	broker := horizon.NewHorizonMessageBroker(host, port)
 
-	err := broker.Run(ctx, nil)
+	err := broker.Run(ctx)
 	if err != nil {
 		t.Fatalf("failed to run broker: %v", err)
 	}

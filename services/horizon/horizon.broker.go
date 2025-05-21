@@ -10,9 +10,9 @@ import (
 )
 
 // MessageBroker defines the interface for pub/sub messaging systems
-type MessageBroker interface {
+type MessageBrokerService interface {
 	// Run connects to a broker cluster
-	Run(ctx context.Context, brokers []string) error
+	Run(ctx context.Context) error
 
 	// Stop closes all producer/consumer connections
 	Stop(ctx context.Context) error
@@ -33,7 +33,7 @@ type HorizonMessageBroker struct {
 	nc   *nats.Conn
 }
 
-func NewHorizonMessageBroker(host string, port int) MessageBroker {
+func NewHorizonMessageBroker(host string, port int) MessageBrokerService {
 	return &HorizonMessageBroker{
 		host: host,
 		port: port,
@@ -41,7 +41,7 @@ func NewHorizonMessageBroker(host string, port int) MessageBroker {
 }
 
 // Run implements MessageBroker.
-func (h *HorizonMessageBroker) Run(ctx context.Context, brokers []string) error {
+func (h *HorizonMessageBroker) Run(ctx context.Context) error {
 	natsURL := fmt.Sprintf("nats://%s:%d", h.host, h.port)
 	nc, err := nats.Connect(natsURL)
 	if err != nil {

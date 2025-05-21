@@ -77,7 +77,7 @@ func TestHorizonSchedule_StartAndStop(t *testing.T) {
 	s := horizon.NewHorizonSchedule()
 	ctx := context.Background()
 
-	err := s.Start(ctx)
+	err := s.Run(ctx)
 	assert.NoError(t, err)
 
 	err = s.Stop(ctx)
