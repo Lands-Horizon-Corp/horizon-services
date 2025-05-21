@@ -27,11 +27,9 @@ func (c TestClaim) GetRegisteredClaims() *jwt.RegisteredClaims {
 
 func setupService() *horizon.HorizonTokenService[TestClaim] {
 	env := horizon.NewEnvironmentService("../../.env")
-	token := []byte(env.GetString("APP_TOKEN", ""))
-	name := env.GetString("APP_NAME", "")
 	return &horizon.HorizonTokenService[TestClaim]{
-		Name:   name,
-		Secret: token,
+		Name:   env.GetString("APP_NAME", ""),
+		Secret: []byte(env.GetString("APP_TOKEN", "")),
 	}
 }
 
