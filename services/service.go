@@ -172,11 +172,12 @@ func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 			service.Environment.GetString("SMTP_FROM", ""),
 		)
 	}
+
 	service.Cron = horizon.NewHorizonSchedule()
 	return service
 }
 
-func (h *HorizonService) Run(ctx context.Context) error {
+func (h *HorizonService) Run(ctx context.Context, port int) error {
 
 	if h.Cron != nil {
 

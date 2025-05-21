@@ -1,6 +1,3 @@
-To add prerequisites to your README for your project, mentioning the required versions of Go and Docker CLI is essential for others to replicate your setup successfully. Here's how you can phrase it:
-
-### README.md
 
 #### Prerequisites
 

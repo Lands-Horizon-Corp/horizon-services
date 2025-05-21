@@ -14,7 +14,7 @@ func main() {
 		},
 	})
 
-	if err := horizon.Run(context.Background()); err != nil {
+	if err := horizon.Run(context.Background(), 1000); err != nil {
 		fmt.Println("Error:", err)
 	}
 }
