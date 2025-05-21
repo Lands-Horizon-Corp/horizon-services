@@ -27,7 +27,7 @@ if err := database.Start(ctx); err != nil {
 */
 
 // SQLDatabase defines the interface for PostgreSQL operations
-type SQLDatabase interface {
+type SQLDatabaseService interface {
 	// Start initializes the connection pool with the database
 	Run(ctx context.Context) error
 
@@ -50,7 +50,7 @@ type GormDatabase struct {
 }
 
 // NewGormDatabase constructs a new GormDatabase
-func NewGormDatabase(dsn string, maxIdle, maxOpen int, maxLifetime time.Duration) SQLDatabase {
+func NewGormDatabase(dsn string, maxIdle, maxOpen int, maxLifetime time.Duration) SQLDatabaseService {
 	return &GormDatabase{
 		dsn:         dsn,
 		maxIdleConn: maxIdle,

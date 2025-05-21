@@ -31,7 +31,7 @@ func setupHorizonOTP() horizon.OTPService {
 		env.GetString("REDIS_USERNAME", ""),
 		env.GetInt("REDIS_PORT", 6379),
 	)
-	cache.Start(context.Background())
+	cache.Run(context.Background())
 	if err := cache.Ping(context.Background()); err != nil {
 		panic(err)
 	}

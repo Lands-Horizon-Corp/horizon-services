@@ -24,7 +24,7 @@ func TestHorizonCache(t *testing.T) {
 	cache := horizon.NewHorizonCache(redisHost, redisPassword, redisUsername, redisPort)
 
 	// Start the Redis connection
-	err := cache.Start(ctx)
+	err := cache.Run(ctx)
 	assert.NoError(t, err, "Start should not return an error")
 
 	// Ping Redis

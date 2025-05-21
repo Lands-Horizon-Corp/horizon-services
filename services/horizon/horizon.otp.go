@@ -20,12 +20,12 @@ type OTPService interface {
 
 type HorizonOTP struct {
 	secret   []byte
-	cache    Cache
+	cache    CacheService
 	security SecurityUtils
 }
 
 // NewHorizonOTP creates a new OTPService instance
-func NewHorizonOTP(secret []byte, cache Cache, security SecurityUtils) OTPService {
+func NewHorizonOTP(secret []byte, cache CacheService, security SecurityUtils) OTPService {
 	return &HorizonOTP{
 		secret:   secret,
 		cache:    cache,

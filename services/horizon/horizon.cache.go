@@ -11,9 +11,9 @@ import (
 )
 
 // Cache defines the interface for Redis operations
-type Cache interface {
+type CacheService interface {
 	// Start initializes the Redis connection pool
-	Start(ctx context.Context) error
+	Run(ctx context.Context) error
 
 	// Stop gracefully shuts down all Redis connections
 	Stop(ctx context.Context) error
@@ -42,7 +42,7 @@ type HorizonCache struct {
 	client   *redis.Client
 }
 
-func NewHorizonCache(host, password, username string, port int) Cache {
+func NewHorizonCache(host, password, username string, port int) CacheService {
 	return &HorizonCache{
 		host:     host,
 		password: password,
@@ -51,7 +51,7 @@ func NewHorizonCache(host, password, username string, port int) Cache {
 		client:   nil,
 	}
 }
-func (h *HorizonCache) Start(ctx context.Context) error {
+func (h *HorizonCache) Run(ctx context.Context) error {
 	h.client = redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", h.host, h.port),
 		Username: h.username,

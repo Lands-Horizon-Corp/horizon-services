@@ -7,34 +7,55 @@ import (
 )
 
 type HorizonService struct {
-	Database map[string]horizon.SQLDatabase
+	Database horizon.SQLDatabaseService
+	Storage  horizon.StorageService
+	Cache    horizon.CacheService
 }
 
-func NewHorizonService() *HorizonService {
+func NewHorizonService(
+	sqlConfig SQLServiceConfig,
+	storageConfig StorageServiceConfig,
+	cacheConfig CacheServiceConfig,
+) *HorizonService {
 	return &HorizonService{
-		Database: make(map[string]horizon.SQLDatabase),
+		Database: horizon.NewGormDatabase(
+			sqlConfig.DSN,
+			sqlConfig.MaxIdleConn,
+			sqlConfig.MaxOpenConn,
+			sqlConfig.MaxLifetime,
+		),
+		Storage: horizon.NewHorizonStorageService(
+			storageConfig.AccessKey,
+			storageConfig.SecretKey,
+			storageConfig.Prefix,
+			storageConfig.Bucket,
+			storageConfig.MaxFilezize,
+		),
+		Cache: horizon.NewHorizonCache(
+			cacheConfig.Host,
+			cacheConfig.Password,
+			cacheConfig.Username,
+			cacheConfig.Port,
+		),
 	}
-}
-
-func (h *HorizonService) AddSQLDatabase(key string, config SQLServiceConfig) {
-	database := horizon.NewGormDatabase(
-		config.DSN,
-		config.MaxIdleConn,
-		config.MaxOpenConn,
-		config.MaxLifetime,
-	)
-	h.Database[key] = database
 }
 
 func (h *HorizonService) Run(ctx context.Context) error {
-
-	for _, db := range h.Database {
-		if err := db.Run(ctx); err != nil {
-			return err
-		}
-		if err := db.Ping(ctx); err != nil {
-			return err
-		}
+	if err := h.Cache.Run(ctx); err != nil {
+		return err
 	}
+	if err := h.Cache.Ping(ctx); err != nil {
+		return err
+	}
+	if err := h.Storage.Run(ctx); err != nil {
+		return err
+	}
+	if err := h.Database.Run(ctx); err != nil {
+		return err
+	}
+	if err := h.Database.Ping(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
