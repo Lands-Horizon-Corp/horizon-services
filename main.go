@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lands-horizon/horizon-server/src"
+	"github.com/lands-horizon/horizon-server/src/controller"
 	"github.com/lands-horizon/horizon-server/src/cooperative_tokens"
 	"github.com/lands-horizon/horizon-server/src/model"
 	"go.uber.org/fx"
@@ -15,6 +16,8 @@ func main() {
 		fx.StartTimeout(10*time.Minute),
 		fx.Provide(
 			src.NewProvider,
+			controller.NewController,
+
 			cooperative_tokens.NewUserToken,
 			cooperative_tokens.NewTransactionBatchToken,
 			cooperative_tokens.NewUserOrganizatonToken,
@@ -25,7 +28,7 @@ func main() {
 			// Feedback
 			model.NewFeedbackCollection,
 		),
-		fx.Invoke(func(lc fx.Lifecycle, provider *src.Provider) error {
+		fx.Invoke(func(lc fx.Lifecycle, controller *controller.Controller, provider *src.Provider) error {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					if err := provider.Service.Run(ctx); err != nil {
