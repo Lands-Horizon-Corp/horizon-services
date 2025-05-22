@@ -31,6 +31,7 @@ func main() {
 		fx.Invoke(func(lc fx.Lifecycle, controller *controller.Controller, provider *src.Provider) error {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
+					controller.Routes()
 					if err := provider.Service.Run(ctx); err != nil {
 						return err
 					}

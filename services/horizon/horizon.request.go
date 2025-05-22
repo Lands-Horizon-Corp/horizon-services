@@ -22,6 +22,21 @@ type APIService interface {
 	Stop(ctx context.Context) error
 
 	Client() *echo.Echo
+
+	GetRoutes() []Routes
+
+	RegisterRouteGET(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
+	RegisterRoutePOST(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
+	RegisterRoutePUT(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
+	RegisterRouteDELETE(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
+	RegisterRoutePATCH(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
+}
+
+type Routes struct {
+	route    string
+	request  string
+	response string
+	method   string
 }
 
 type HorizonAPIService struct {
@@ -30,6 +45,8 @@ type HorizonAPIService struct {
 	metricsPort int
 	clientURL   string
 	clientName  string
+
+	routesList []Routes
 }
 
 var suspiciousPathPattern = regexp.MustCompile(`(?i)\.(env|yaml|yml|ini|config|conf|xml|git|htaccess|htpasswd|backup|secret|credential|password|private|key|token|dump|database|db|logs|debug)$|dockerfile|Dockerfile`)
@@ -144,23 +161,85 @@ func NewHorizonAPIService(
 	service.GET("/health", func(c echo.Context) error {
 		return c.String(200, "OK")
 	})
-	return HorizonAPIService{
+	return &HorizonAPIService{
 		service: service,
 
 		serverPort:  serverPort,
 		metricsPort: metricsPort,
 		clientURL:   clientURL,
 		clientName:  clientName,
+		routesList:  []Routes{},
 	}
 }
 
 // Client implements APIService.
-func (h HorizonAPIService) Client() *echo.Echo {
+func (h *HorizonAPIService) Client() *echo.Echo {
 	return h.service
 }
 
+// GetRoutes implements APIService.
+func (h *HorizonAPIService) GetRoutes() []Routes {
+	return h.routesList
+}
+
+// RegisterRouteDELETE implements APIService.
+func (h *HorizonAPIService) RegisterRouteDELETE(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
+	h.service.DELETE(route, callback, m...)
+	h.routesList = append(h.routesList, Routes{
+		route:    route,
+		request:  request,
+		response: response,
+		method:   "DELETE",
+	})
+}
+
+// RegisterRouteGET implements APIService.
+func (h *HorizonAPIService) RegisterRouteGET(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
+	h.service.GET(route, callback, m...)
+	h.routesList = append(h.routesList, Routes{
+		route:    route,
+		request:  request,
+		response: response,
+		method:   "GET",
+	})
+}
+
+// RegisterRoutePATCH implements APIService.
+func (h *HorizonAPIService) RegisterRoutePATCH(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
+	h.service.PATCH(route, callback, m...)
+
+	h.routesList = append(h.routesList, Routes{
+		route:    route,
+		request:  request,
+		response: response,
+		method:   "PATCH",
+	})
+}
+
+// RegisterRoutePOST implements APIService.
+func (h *HorizonAPIService) RegisterRoutePOST(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
+	h.service.POST(route, callback, m...)
+	h.routesList = append(h.routesList, Routes{
+		route:    route,
+		request:  request,
+		response: response,
+		method:   "POST",
+	})
+}
+
+// RegisterRoutePUT implements APIService.
+func (h *HorizonAPIService) RegisterRoutePUT(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
+	h.service.PUT(route, callback, m...)
+	h.routesList = append(h.routesList, Routes{
+		route:    route,
+		request:  request,
+		response: response,
+		method:   "PUT",
+	})
+}
+
 // Run implements APIService.
-func (h HorizonAPIService) Run(ctx context.Context) error {
+func (h *HorizonAPIService) Run(ctx context.Context) error {
 	go func() {
 		metrics := echo.New()
 		metrics.GET("/metrics", echoprometheus.NewHandler())
@@ -175,11 +254,10 @@ func (h HorizonAPIService) Run(ctx context.Context) error {
 		))
 	}()
 	return nil
-
 }
 
 // Stop implements APIService.
-func (h HorizonAPIService) Stop(ctx context.Context) error {
+func (h *HorizonAPIService) Stop(ctx context.Context) error {
 	if err := h.service.Shutdown(ctx); err != nil {
 		return eris.New("failed to gracefully shutdown server")
 	}
