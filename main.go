@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/lands-horizon/horizon-server/src"
 	"github.com/lands-horizon/horizon-server/src/cooperative_tokens"
@@ -11,6 +12,7 @@ import (
 
 func main() {
 	app := fx.New(
+		fx.StartTimeout(10*time.Minute),
 		fx.Provide(
 			src.NewProvider,
 			cooperative_tokens.NewUserToken,
@@ -49,5 +51,4 @@ func main() {
 		}),
 	)
 	app.Run()
-
 }
