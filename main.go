@@ -23,7 +23,7 @@ func main() {
 			// Feedback
 			model.NewFeedbackCollection,
 		),
-		fx.Invoke(func(lc fx.Lifecycle, provider src.Provider) error {
+		fx.Invoke(func(lc fx.Lifecycle, provider *src.Provider) error {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					if err := provider.Service.Run(ctx); err != nil {
