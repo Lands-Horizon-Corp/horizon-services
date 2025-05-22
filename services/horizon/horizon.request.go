@@ -182,6 +182,9 @@ func NewHorizonAPIService(
 	// 9. Metrics middleware
 	service.Use(echoprometheus.NewMiddleware(clientName))
 
+	service.Use(middleware.GzipWithConfig(middleware.GzipConfig{
+		Level: 5,
+	}))
 	service.GET("/health", func(c echo.Context) error {
 		return c.String(200, "OK")
 	})
