@@ -51,4 +51,5 @@ func NewController(
 
 func (c *Controller) Routes() {
 	c.MediaController()
+	c.FeedbackController()
 }
