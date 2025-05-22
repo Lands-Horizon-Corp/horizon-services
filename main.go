@@ -16,6 +16,7 @@ func main() {
 		fx.StartTimeout(10*time.Minute),
 		fx.Provide(
 			src.NewProvider,
+			src.NewValidator,
 			controller.NewController,
 
 			cooperative_tokens.NewUserToken,

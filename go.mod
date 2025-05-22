@@ -79,6 +79,7 @@ require (
 )
 
 require (
+	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/gocql/gocql v1.7.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.2

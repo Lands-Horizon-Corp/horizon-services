@@ -1,6 +1,9 @@
 package src
 
-import horizon_services "github.com/lands-horizon/horizon-server/services"
+import (
+	"github.com/go-playground/validator"
+	horizon_services "github.com/lands-horizon/horizon-server/services"
+)
 
 type Provider struct {
 	Service *horizon_services.HorizonService
@@ -15,4 +18,8 @@ func NewProvider() *Provider {
 	return &Provider{
 		Service: horizonService,
 	}
+}
+
+func NewValidator() *validator.Validate {
+	return validator.New()
 }

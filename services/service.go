@@ -3,6 +3,7 @@ package horizon_services
 import (
 	"context"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/rotisserie/eris"
 )
@@ -20,6 +21,7 @@ type HorizonService struct {
 	SMTP        horizon.SMTPService
 	Request     horizon.APIService
 	QR          horizon.QRService
+	Validator   *validator.Validate
 }
 
 type HorizonServiceConfig struct {
@@ -37,7 +39,7 @@ type HorizonServiceConfig struct {
 
 func NewHorizonService(cfg HorizonServiceConfig) *HorizonService {
 	service := &HorizonService{}
-
+	service.Validator = validator.New()
 	env := "./.env"
 	if cfg.EnvironmentConfig != nil {
 		env = cfg.EnvironmentConfig.Path

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/lands-horizon/horizon-server/services/horizon"
@@ -16,7 +15,7 @@ import (
 type Repository[TData any, TResponse any, TRequest any] interface {
 
 	// Validate
-	Validate(ctx echo.Context, v *validator.Validate) (*TRequest, error)
+	Validate(ctx echo.Context) (*TRequest, error)
 
 	// Models
 	ToModel(data *TData) *TResponse
@@ -182,12 +181,12 @@ func (c *CollectionManager[TData, TResponse, TRequest]) ToModels(data []*TData) 
 }
 
 // Validate implements Repository.
-func (c *CollectionManager[TData, TResponse, TRequest]) Validate(ctx echo.Context, v *validator.Validate) (*TRequest, error) {
+func (c *CollectionManager[TData, TResponse, TRequest]) Validate(ctx echo.Context) (*TRequest, error) {
 	var req TRequest
 	if err := ctx.Bind(&req); err != nil {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	if err := v.Struct(req); err != nil {
+	if err := c.service.Validator.Struct(req); err != nil {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return &req, nil
