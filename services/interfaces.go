@@ -1,4 +1,4 @@
-package services
+package horizon_services
 
 import (
 	"time"

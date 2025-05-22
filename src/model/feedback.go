@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	horizon_services "github.com/lands-horizon/horizon-server/services"
 	"github.com/lands-horizon/horizon-server/src"
 	"gorm.io/gorm"
 )
@@ -44,14 +45,14 @@ type (
 	}
 
 	FeedbackCollection struct {
-		Manager Repository[Feedback, FeedbackResponse, FeedbackRequest]
+		Manager horizon_services.Repository[Feedback, FeedbackResponse, FeedbackRequest]
 	}
 )
 
 func NewFeedbackCollection(provider *src.Provider, media *MediaCollection) (*FeedbackCollection, error) {
-	manager := NewRepository(RepositoryParams[Feedback, FeedbackResponse, FeedbackRequest]{
+	manager := horizon_services.NewRepository(horizon_services.RepositoryParams[Feedback, FeedbackResponse, FeedbackRequest]{
 		Preloads: nil,
-		Provider: provider,
+		Service:  provider.Service,
 		Resource: func(data *Feedback) *FeedbackResponse {
 			if data == nil {
 				return nil

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	horizon_services "github.com/lands-horizon/horizon-server/services"
 	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/lands-horizon/horizon-server/src"
 	"gorm.io/gorm"
@@ -59,14 +60,14 @@ type (
 	}
 
 	MediaCollection struct {
-		Manager Repository[Media, MediaResponse, MediaRequest]
+		Manager horizon_services.Repository[Media, MediaResponse, MediaRequest]
 	}
 )
 
 func NewMediaCollection(provider *src.Provider) (*MediaCollection, error) {
-	manager := NewRepository(RepositoryParams[Media, MediaResponse, MediaRequest]{
+	manager := horizon_services.NewRepository(horizon_services.RepositoryParams[Media, MediaResponse, MediaRequest]{
 		Preloads: nil,
-		Provider: provider,
+		Service:  provider.Service,
 		Resource: func(data *Media) *MediaResponse {
 			if data == nil {
 				return nil

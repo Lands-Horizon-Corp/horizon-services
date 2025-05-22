@@ -1,16 +1,14 @@
 package src
 
-import (
-	"github.com/lands-horizon/horizon-server/services"
-)
+import horizon_services "github.com/lands-horizon/horizon-server/services"
 
 type Provider struct {
-	Service *services.HorizonService
+	Service *horizon_services.HorizonService
 }
 
 func NewProvider() *Provider {
-	horizonService := services.NewHorizonService(services.HorizonServiceConfig{
-		EnvironmentConfig: &services.EnvironmentServiceConfig{
+	horizonService := horizon_services.NewHorizonService(horizon_services.HorizonServiceConfig{
+		EnvironmentConfig: &horizon_services.EnvironmentServiceConfig{
 			Path: "./.env",
 		},
 	})
