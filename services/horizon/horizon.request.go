@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/labstack/echo-contrib/echoprometheus"
@@ -16,27 +17,38 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// APIService defines the interface for an API server with methods for lifecycle control, route registration, and client access.
 type APIService interface {
+	// Run starts the API service and listens for incoming requests.
 	Run(ctx context.Context) error
 
+	// Stop gracefully shuts down the API service.
 	Stop(ctx context.Context) error
 
+	// Client returns the underlying Echo instance for advanced customizations.
 	Client() *echo.Echo
 
-	GetRoutes() []Routes
+	// GetRoute returns a list of all registered routes.
+	GetRoute() []Route
 
-	RegisterRouteGET(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
-	RegisterRoutePOST(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
-	RegisterRoutePUT(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
-	RegisterRouteDELETE(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
-	RegisterRoutePATCH(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
+	RegisterRoute(route Route, callback func(c echo.Context) error, m ...echo.MiddlewareFunc)
 }
 
-type Routes struct {
-	route    string
-	request  string
-	response string
-	method   string
+const (
+	Green  = "\033[32m"
+	Blue   = "\033[34m"
+	Yellow = "\033[33m"
+	Red    = "\033[31m"
+	Reset  = "\033[0m"
+	Cyan   = "\033[36m"
+)
+
+type Route struct {
+	Route    string
+	Request  string
+	Response string
+	Method   string
+	Note     string
 }
 
 type HorizonAPIService struct {
@@ -46,7 +58,7 @@ type HorizonAPIService struct {
 	clientURL   string
 	clientName  string
 
-	routesList []Routes
+	routesList []Route
 }
 
 var suspiciousPathPattern = regexp.MustCompile(`(?i)\.(env|yaml|yml|ini|config|conf|xml|git|htaccess|htpasswd|backup|secret|credential|password|private|key|token|dump|database|db|logs|debug)$|dockerfile|Dockerfile`)
@@ -162,13 +174,12 @@ func NewHorizonAPIService(
 		return c.String(200, "OK")
 	})
 	return &HorizonAPIService{
-		service: service,
-
+		service:     service,
 		serverPort:  serverPort,
 		metricsPort: metricsPort,
 		clientURL:   clientURL,
 		clientName:  clientName,
-		routesList:  []Routes{},
+		routesList:  []Route{},
 	}
 }
 
@@ -177,69 +188,40 @@ func (h *HorizonAPIService) Client() *echo.Echo {
 	return h.service
 }
 
-// GetRoutes implements APIService.
-func (h *HorizonAPIService) GetRoutes() []Routes {
+// GetRoute implements APIService.
+func (h *HorizonAPIService) GetRoute() []Route {
 	return h.routesList
 }
 
 // RegisterRouteDELETE implements APIService.
-func (h *HorizonAPIService) RegisterRouteDELETE(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
-	h.service.DELETE(route, callback, m...)
-	h.routesList = append(h.routesList, Routes{
-		route:    route,
-		request:  request,
-		response: response,
-		method:   "DELETE",
-	})
-}
-
-// RegisterRouteGET implements APIService.
-func (h *HorizonAPIService) RegisterRouteGET(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
-	h.service.GET(route, callback, m...)
-	h.routesList = append(h.routesList, Routes{
-		route:    route,
-		request:  request,
-		response: response,
-		method:   "GET",
-	})
-}
-
-// RegisterRoutePATCH implements APIService.
-func (h *HorizonAPIService) RegisterRoutePATCH(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
-	h.service.PATCH(route, callback, m...)
-
-	h.routesList = append(h.routesList, Routes{
-		route:    route,
-		request:  request,
-		response: response,
-		method:   "PATCH",
-	})
-}
-
-// RegisterRoutePOST implements APIService.
-func (h *HorizonAPIService) RegisterRoutePOST(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
-	h.service.POST(route, callback, m...)
-	h.routesList = append(h.routesList, Routes{
-		route:    route,
-		request:  request,
-		response: response,
-		method:   "POST",
-	})
-}
-
-// RegisterRoutePUT implements APIService.
-func (h *HorizonAPIService) RegisterRoutePUT(request string, response string, route string, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
-	h.service.PUT(route, callback, m...)
-	h.routesList = append(h.routesList, Routes{
-		route:    route,
-		request:  request,
-		response: response,
-		method:   "PUT",
+func (h *HorizonAPIService) RegisterRoute(route Route, callback func(c echo.Context) error, m ...echo.MiddlewareFunc) {
+	method := strings.ToUpper(strings.TrimSpace(route.Method))
+	switch method {
+	case "GET":
+		h.service.GET(route.Route, callback, m...)
+	case "POST":
+		h.service.POST(route.Route, callback, m...)
+	case "PUT":
+		h.service.PUT(route.Route, callback, m...)
+	case "PATCH":
+		h.service.PATCH(route.Route, callback, m...)
+	case "DELETE":
+		h.service.DELETE(route.Route, callback, m...)
+	default:
+		panic(fmt.Sprintf("Unsupported HTTP method: %s", method))
+	}
+	h.routesList = append(h.routesList, Route{
+		Route:    route.Route,
+		Request:  route.Request,
+		Response: route.Response,
+		Method:   method,
+		Note:     route.Note,
 	})
 }
 
 // Run implements APIService.
 func (h *HorizonAPIService) Run(ctx context.Context) error {
+	h.PrintGroupedRoute()
 	go func() {
 		metrics := echo.New()
 		metrics.GET("/metrics", echoprometheus.NewHandler())
@@ -262,4 +244,66 @@ func (h *HorizonAPIService) Stop(ctx context.Context) error {
 		return eris.New("failed to gracefully shutdown server")
 	}
 	return nil
+}
+func (h *HorizonAPIService) PrintGroupedRoute() {
+	grouped := make(map[string][]Route)
+	for _, rt := range h.routesList {
+		grouped[rt.Route] = append(grouped[rt.Route], rt)
+	}
+	routePaths := make([]string, 0, len(grouped))
+	for route := range grouped {
+		routePaths = append(routePaths, route)
+	}
+	sort.Strings(routePaths)
+
+	fmt.Printf("\n\n================== API ROUTES ==================\n\n")
+
+	for _, route := range routePaths {
+		methodGroup := grouped[route]
+
+		sort.Slice(methodGroup, func(i, j int) bool {
+			return methodGroup[i].Method < methodGroup[j].Method
+		})
+
+		fmt.Printf("🔹 %s Route Group %s: [%d] %s\n", Cyan, route, len(methodGroup), Reset)
+		fmt.Println("------------------------------------------------")
+
+		for _, rt := range methodGroup {
+			color := ""
+			switch rt.Method {
+			case "GET":
+				color = Green
+			case "POST":
+				color = Blue
+			case "PUT":
+				color = Yellow
+			case "DELETE":
+				color = Red
+			default:
+				color = Reset
+			}
+
+			req := rt.Request
+			if req == "" {
+				req = "No Request"
+			}
+			res := rt.Response
+			if res == "" {
+				res = "No Response"
+			}
+
+			fmt.Printf("\t%s⇒ %-6s\t%s%s%s%s\n", color, rt.Method, Reset, color, rt.Route, Reset)
+
+			fmt.Printf("\t\033[36mRequest ⇒\033[0m   \t%s\n", req)
+			fmt.Printf("\t\033[36mResponse ⇒\033[0m  \t%s\n", res)
+
+			if rt.Note != "" {
+				fmt.Printf("\t\033[2mNote         \t%s\n\n\033[0m", rt.Note)
+			} else {
+				fmt.Printf("\n")
+			}
+		}
+
+		fmt.Printf("------------------------------------------------\n")
+	}
 }
