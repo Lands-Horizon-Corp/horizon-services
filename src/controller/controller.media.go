@@ -15,18 +15,6 @@ func (c *Controller) MediaController() {
 	req := c.provider.Service.Request
 
 	req.RegisterRoute(horizon.Route{
-		Route:    "/media",
-		Method:   "GET",
-		Response: "TMedia[]",
-	}, func(ctx echo.Context) error {
-		media, err := c.media.Manager.ListRaw(context.Background())
-		if err != nil {
-			return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		}
-		return ctx.JSON(http.StatusOK, media)
-	})
-
-	req.RegisterRoute(horizon.Route{
 		Route:    "/media/:media_id",
 		Method:   "GET",
 		Response: "TMedia",

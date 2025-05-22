@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
@@ -232,7 +233,7 @@ func (h *HorizonAPIService) RegisterRoute(route Route, callback func(c echo.Cont
 
 // Run implements APIService.
 func (h *HorizonAPIService) Run(ctx context.Context) error {
-	h.PrintGroupedRoute()
+
 	go func() {
 		metrics := echo.New()
 		metrics.GET("/metrics", echoprometheus.NewHandler())
@@ -246,6 +247,7 @@ func (h *HorizonAPIService) Run(ctx context.Context) error {
 			fmt.Sprintf(":%d", h.serverPort),
 		))
 	}()
+	h.PrintGroupedRoute()
 	return nil
 }
 
@@ -257,9 +259,21 @@ func (h *HorizonAPIService) Stop(ctx context.Context) error {
 	return nil
 }
 func (h *HorizonAPIService) PrintGroupedRoute() {
+	time.Sleep(5 * time.Second)
+
 	grouped := make(map[string][]Route)
+
 	for _, rt := range h.routesList {
-		grouped[rt.Route] = append(grouped[rt.Route], rt)
+		trimmed := strings.TrimPrefix(rt.Route, "/")
+		segments := strings.Split(trimmed, "/")
+		var key string
+		if len(segments) > 0 && segments[0] != "" {
+			key = segments[0]
+		} else {
+			key = "/"
+		}
+
+		grouped[key] = append(grouped[key], rt)
 	}
 	routePaths := make([]string, 0, len(grouped))
 	for route := range grouped {
