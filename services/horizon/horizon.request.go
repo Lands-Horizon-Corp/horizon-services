@@ -17,6 +17,17 @@ import (
 	"golang.org/x/time/rate"
 )
 
+/*
+req.RegisterRoute(horizon.Route{
+	Route:    "/sure",
+	Method:   "POST",
+	Request:  "",
+	Response: "string", // or "OK"
+	Note:     "Health check endpoint",
+}, func(c echo.Context) error {
+	return c.String(200, "OK")
+})
+*/
 // APIService defines the interface for an API server with methods for lifecycle control, route registration, and client access.
 type APIService interface {
 	// Run starts the API service and listens for incoming requests.

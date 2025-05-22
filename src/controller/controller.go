@@ -1,111 +1,54 @@
 package controller
 
 import (
-	"github.com/labstack/echo/v4"
-	"github.com/lands-horizon/horizon-server/services/horizon"
 	"github.com/lands-horizon/horizon-server/src"
+	"github.com/lands-horizon/horizon-server/src/cooperative_tokens"
+	"github.com/lands-horizon/horizon-server/src/model"
 )
 
 type Controller struct {
+	// Services
 	provider *src.Provider
+
+	// Tokens
+	transactionBatchToken *cooperative_tokens.TransactionBatchToken
+	userOrganizationToken *cooperative_tokens.UserOrganizatonToken
+	userToken             *cooperative_tokens.UserToken
+
+	// Models
+	media    *model.MediaCollection
+	feedback *model.FeedbackCollection
 }
 
-func NewController(provider *src.Provider) (*Controller, error) {
-	return &Controller{provider: provider}, nil
+func NewController(
+	// Services
+	provider *src.Provider,
+
+	// Tokens
+	transactionBatchToken *cooperative_tokens.TransactionBatchToken,
+	userOrganizationToken *cooperative_tokens.UserOrganizatonToken,
+	userToken *cooperative_tokens.UserToken,
+
+	// Models
+	media *model.MediaCollection,
+	feedback *model.FeedbackCollection,
+
+) (*Controller, error) {
+	return &Controller{
+		// Services
+		provider: provider,
+
+		// Tokens
+		transactionBatchToken: transactionBatchToken,
+		userOrganizationToken: userOrganizationToken,
+		userToken:             userToken,
+
+		// Models
+		media:    media,
+		feedback: feedback,
+	}, nil
 }
 
 func (c *Controller) Routes() {
-	req := c.provider.Service.Request
-
-	req.RegisterRoute(horizon.Route{
-		Route:    "/health",
-		Method:   "GET",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/health",
-		Method:   "GET",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/health",
-		Method:   "GET",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/health",
-		Method:   "GET",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/health",
-		Method:   "GET",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-
-	req.RegisterRoute(horizon.Route{
-		Route:    "/sure",
-		Method:   "GET",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/sure",
-		Method:   "GET",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/sure",
-		Method:   "DELETE",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/sure",
-		Method:   "PUT",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
-	req.RegisterRoute(horizon.Route{
-		Route:    "/sure",
-		Method:   "POST",
-		Request:  "",
-		Response: "string", // or "OK"
-		Note:     "Health check endpoint",
-	}, func(c echo.Context) error {
-		return c.String(200, "OK")
-	})
+	c.MediaController()
 }
